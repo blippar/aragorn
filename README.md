@@ -24,7 +24,7 @@ You can humanize the log output with `-humanize`.
 A tests suite describes a combination of tests to be run. It is composed of some configuration fields and of the tests suite itself, that depends on the type set (`HTTP` or `GRPC`).
 
 |Name|Type|Required|Description|
-|-|-|-|-|
+|-|-|:-:|-|
 |name|`string`|✔️|The name of this suite.|
 |type|`string`|✔️|`HTTP` or `GRPC` (currently only `HTTP` is implemented)|
 |runEvery|`string`||A duration string parsable by time.ParseDuration specifying at each interval this tests suite should be run. Exclusive with `runCron`.|
@@ -49,21 +49,21 @@ Example :
 An HTTP tests suite contains a base configuration and list of tests.
 
 |Name|Type|Required|Description|
-|-|-|-|-|
+|-|-|:-:|-|
 |base|`HTTPBase`|✔️|Base description of the tests in this suite like base URL or HTTP headers to add too all requests|
 |tests|`[]HTTPTest`|✔️|List of tests to run.|
 
 `HTTPBase`
 
 |Name|Type|Required|Description|
-|-|-|-|-|
+|-|-|:-:|-|
 |url|`string`|✔️|Base URL prepended to all `path` in each test request.|
 |headers|`map[string]string`||List of headers to add to every test in this suite. Each test can overwrite a header set at this level.|
 
 `HTTPTest`
 
 |Name|Type|Required|Description|
-|-|-|-|-|
+|-|-|:-:|-|
 |name|`string`|✔️|Name used to uniquely identify this test in the suite.|
 |request|`HTTPRequest`|✔️|Description of the HTTP request to perform.|
 |expect|`HTTPExpect`|✔️|Expected result of the HTTP request.|
@@ -71,7 +71,7 @@ An HTTP tests suite contains a base configuration and list of tests.
 `HTTPRequest`
 
 |Name|Type|Required|Description|
-|-|-|-|-|
+|-|-|:-:|-|
 |path|`string`||Path appended to the base `url` set in the `HTTPBase`. Defaults to `/`.|
 |method|`string`||HTTP method of the request. Defaults to `GET`.|
 |headers|`map[string]string`||HTTP headers of the request.|
@@ -83,7 +83,7 @@ An HTTP tests suite contains a base configuration and list of tests.
 `HTTPExpect`
 
 |Name|Type|Required|Description|
-|-|-|-|-|
+|-|-|:-:|-|
 |statusCode|`int`|✔️|Expected HTTP status code.|
 |headers|`map[string]string`||Expected HTTP headers.|
 |jsonDocument|`string`||Expected JSON document to be returned. Format is not taken into account, only values are compared. Can be an inline string value (escaped JSON), or a separate JSON file, if starting with the character `@`.|
