@@ -18,7 +18,7 @@ const (
 	orangeColor = "#f99157"
 )
 
-var _ = Notifier(&SlackNotifer{})
+var _ = Notifier(&SlackNotifier{})
 
 type notification struct {
 	Channel     string       `json:"channel"`
@@ -45,9 +45,9 @@ type attachmentField struct {
 	Value string `json:"value"`
 }
 
-// SlackNotifer is a reporter that stacks errors for later use.
+// SlackNotifier is a reporter that stacks errors for later use.
 // Stacked errors are printed on each report and removed from the stack.
-type SlackNotifer struct {
+type SlackNotifier struct {
 	webhook   string
 	suiteName string
 
@@ -71,35 +71,35 @@ func (t *testResult) hasError() bool {
 	return t.err != nil
 }
 
-// NewSlackNotifier returns a new SlackNotifer given a Slack webhook and a tests suite name.
-func NewSlackNotifier(webhook, name string) *SlackNotifer {
-	return &SlackNotifer{webhook: webhook, suiteName: name}
+// NewSlackNotifier returns a new SlackNotifier given a Slack webhook and a tests suite name.
+func NewSlackNotifier(webhook, name string) *SlackNotifier {
+	return &SlackNotifier{webhook: webhook, suiteName: name}
 }
 
 // BeforeTest implements the notifier interface.
-func (r *SlackNotifer) BeforeTest(name string) {
+func (r *SlackNotifier) BeforeTest(name string) {
 	r.start = time.Now()
 	r.currentRes = testResult{name: name}
 }
 
 // Report implements the notifier interface.
-func (r *SlackNotifer) Report(err error) {
+func (r *SlackNotifier) Report(err error) {
 	r.currentRes.failures = append(r.currentRes.failures, err)
 }
 
 // TestError implements the notifier interface.
-func (r *SlackNotifer) TestError(err error) {
+func (r *SlackNotifier) TestError(err error) {
 	r.currentRes.err = err
 }
 
 // AfterTest implements the notifier interface.
-func (r *SlackNotifer) AfterTest() {
+func (r *SlackNotifier) AfterTest() {
 	r.currentRes.duration = time.Since(r.start)
 	r.results = append(r.results, r.currentRes)
 }
 
 // SuiteDone implements the notifier interface.
-func (r *SlackNotifer) SuiteDone() {
+func (r *SlackNotifier) SuiteDone() {
 	failures := 0
 	errors := 0
 	for _, r := range r.results {

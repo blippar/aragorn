@@ -9,7 +9,7 @@ When a tests suite is run, each of its tests is executed. For each test, there a
 
 > A request error can be an HTTP error while trying to make the request for example. Those errors will be retried 3 times, with a 30s pause in between each try. A failure is not retried.
 
-Where the failures/errors are reported and how they are reported depends on the notifier configured. For now the only one implemented is the SlackNotifer. It is set at the initialization of a tests suite. During a tests suite execution, it stacks every potential failure and/or error. At then end of the exectution of the suite, it will send a notification describing what happened if there was any failure or error. If everything ran without any issue, no notification is sent.
+Where the failures/errors are reported and how they are reported depends on the notifier configured. For now the only one implemented is the SlackNotifier. It is set at the initialization of a tests suite. During a tests suite execution, it stacks every potential failure and/or error. At then end of the exectution of the suite, it will send a notification describing what happened if there was any failure or error. If everything ran without any issue, no notification is sent.
 
 # Quick Start
 
