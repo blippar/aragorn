@@ -120,9 +120,9 @@ func (r *SlackNotifier) SuiteDone() {
 		test = "tests"
 	}
 	notif := &notification{
-		Username: "ah-ragorn",
-		Channel:  "aragorn-test",
-		Text:     fmt.Sprintf("*%s* - %d %s failed", r.suiteName, failures+errors, test),
+		// Username: "aragorn",
+		// Channel:  "aragorn-test",
+		Text: fmt.Sprintf("*%s* - %d %s failed", r.suiteName, failures+errors, test),
 	}
 
 	var attachments []attachment

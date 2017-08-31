@@ -106,7 +106,7 @@ func (s *service) loadDirs() error {
 		if strings.HasSuffix(p, ".suite.json") {
 			log.Info("loading tests suite", zap.String("file", p))
 			if err := s.newTestSuiteFromDisk(p); err != nil {
-				return fmt.Errorf("could not create tests suite from disk: %v", err)
+				log.Error("could not load test suite", zap.String("file", p), zap.Error(err))
 			}
 		}
 		return e

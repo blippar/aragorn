@@ -9,11 +9,16 @@ var l *zap.Logger
 
 func Init(debug bool) error {
 	var err error
+	var zapCfg zap.Config
 	if debug {
-		l, err = zap.NewDevelopment()
+		zapCfg = zap.NewDevelopmentConfig()
 	} else {
-		l, err = zap.NewProduction()
+		zapCfg = zap.NewProductionConfig()
 	}
+
+	zapCfg.DisableStacktrace = true
+
+	l, err = zapCfg.Build()
 	if err != nil {
 		return err
 	}
