@@ -1,0 +1,21 @@
+
+[[constraint]]
+  name = "github.com/fsnotify/fsnotify"
+  version = "^1.4.2"
+
+[[constraint]]
+  name = "github.com/gorhill/cronexpr"
+  version = "^1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/jmoiron/jsonq"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/santhosh-tekuri/jsonschema"
+
+[[constraint]]
+  name = "go.uber.org/zap"
+  version = "~1.6.0"
+  
