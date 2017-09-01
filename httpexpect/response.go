@@ -72,6 +72,13 @@ func (r *Response) ContainsHeaders(h headers) {
 	}
 }
 
+// MatchRawDocument checks whether the raw response body matches the given document.
+func (r *Response) MatchRawDocument(doc []byte) {
+	if !cmp.Equal(r.body, doc) {
+		r.reporter.Report(fmt.Errorf("request body does not match document"))
+	}
+}
+
 // MatchJSONDocument checks whether the JSON response body matches the given document.
 func (r *Response) MatchJSONDocument(doc map[string]interface{}) {
 	resp := map[string]interface{}{}

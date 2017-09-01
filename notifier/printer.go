@@ -10,9 +10,10 @@ var _ = Notifier(&Printer{})
 // Printer is a reporter that stacks errors for later use.
 // Stacked errors are printed on each report and removed from the stack.
 type Printer struct {
-	name  string
-	start time.Time
-	errs  []error
+	name     string
+	start    time.Time
+	failures []error
+	err      error
 }
 
 // NewPrinter returns a new Printer.
@@ -28,24 +29,30 @@ func (r *Printer) BeforeTest(name string) {
 
 // Report implements the Reporter interface.
 func (r *Printer) Report(err error) {
-	r.errs = append(r.errs, err)
+	r.failures = append(r.failures, err)
 }
 
 // TestError implements the Reporter interface.
 func (r *Printer) TestError(err error) {
+	r.err = err
 }
 
 // AfterTest implements the Reporter interface.
 func (r *Printer) AfterTest() {
-	if len(r.errs) > 0 {
-		for _, err := range r.errs {
-			fmt.Println(err.Error())
+	if len(r.failures) > 0 || r.err != nil {
+		if r.err != nil {
+			fmt.Println(r.err.Error())
+		} else {
+			for _, err := range r.failures {
+				fmt.Println(err.Error())
+			}
 		}
 		fmt.Printf("[%s] FAILED (%v)\n", r.name, time.Since(r.start))
 	} else {
 		fmt.Printf("[%s] PASS (%v)\n", r.name, time.Since(r.start))
 	}
-	r.errs = nil
+	r.failures = nil
+	r.err = nil
 }
 
 // SuiteDone implements the Reporter interface.

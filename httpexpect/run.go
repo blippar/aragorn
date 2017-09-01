@@ -21,8 +21,12 @@ func (s *Suite) runTest(t *test) error {
 
 	r.StatusCode(t.Expect.StatusCode)
 	r.ContainsHeaders(t.Expect.Headers)
-	if t.Expect.JSONDocument != nil {
-		r.MatchJSONDocument(t.Expect.jsonDocument)
+	if t.Expect.Document != nil {
+		if t.Expect.jsonDocument != nil {
+			r.MatchJSONDocument(t.Expect.jsonDocument)
+		} else {
+			r.MatchRawDocument(t.Expect.rawDocument)
+		}
 	} else if t.Expect.JSONSchema != nil {
 		r.MatchJSONSchema(t.Expect.jsonSchema)
 		if t.Expect.JSONValues != nil {

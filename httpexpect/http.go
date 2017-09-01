@@ -42,6 +42,7 @@ type test struct {
 }
 
 type request struct {
+	URL     string // If set, will overwrite the base URL.
 	Path    string
 	Method  string
 	Headers headers
@@ -59,13 +60,14 @@ type expect struct {
 	StatusCode int
 	Headers    headers
 
-	JSONDocument json.RawMessage        // Exact document to match. Exclusive with Schema.
+	Document     json.RawMessage        // Exact document to match. Exclusive with JSONSchema.
 	jsonDocument map[string]interface{} // Decoded JSONDocument.
+	rawDocument  []byte                 // Raw document
 
 	JSONSchema json.RawMessage    // Exact JSON schema to match. Exclusive with Document.
 	jsonSchema *jsonschema.Schema // Compiled JSONSchema.
 
-	JSONValues json.RawMessage        // Required JSON values. Optional, if Schema is set.
+	JSONValues json.RawMessage        // Required JSON values. Optional, if JSONSchema is set.
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
 
@@ -110,7 +112,7 @@ func (s *Suite) Init(name string, n notifier.Notifier, opts ...RunOption) error 
 	return nil
 }
 
-// runTestWithRetry will try to run the test t up to n times, waiting for wait time
+// runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
 func (s *Suite) runTestWithRetry(t *test, n int, wait time.Duration) error {
@@ -120,8 +122,13 @@ func (s *Suite) runTestWithRetry(t *test, n int, wait time.Duration) error {
 		if err == nil {
 			return nil
 		}
-		log.Error("run test error", zap.String("name", t.Name), zap.Error(err))
-		time.Sleep(wait)
+		log.Error("run test error",
+			zap.String("name", t.Name),
+			zap.Error(err),
+			zap.Int("attempt", i+1),
+			zap.Int("max_attempt", n),
+			zap.Duration("backoff", wait*time.Duration(i+1)))
+		time.Sleep(wait * time.Duration(i+1))
 	}
 	return err
 }

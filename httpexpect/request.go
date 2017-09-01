@@ -32,7 +32,12 @@ func newHTTPRequest(base *base, req *request) (*http.Request, error) {
 	}
 
 	// Create http.Request.
-	url := base.URL + req.Path
+	var url string
+	if req.URL != "" {
+		url = req.URL + req.Path
+	} else {
+		url = base.URL + req.Path
+	}
 	r, err := http.NewRequest(req.Method, url, bytes.NewReader(req.httpBody))
 	if err != nil {
 		return nil, err
@@ -51,7 +56,7 @@ func newHTTPRequest(base *base, req *request) (*http.Request, error) {
 }
 
 func fromBody(body []byte) ([]byte, error) {
-	if bytes.HasPrefix(body, []byte("\"@")) {
+	if bytes.HasPrefix(body, []byte(`"@`)) && bytes.HasSuffix(body, []byte(`"`)) {
 		b, err := ioutil.ReadFile(string(body[2 : len(body)-1]))
 		if err != nil {
 			return nil, err
