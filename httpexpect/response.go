@@ -46,11 +46,11 @@ func NewResponse(reporter reporter.Reporter, resp *http.Response) (*Response, er
 // need to read it multiple times.
 func (r *Response) readAndCloseBody() error {
 	var err error
+	defer r.httpResp.Body.Close()
 	r.body, err = ioutil.ReadAll(r.httpResp.Body)
 	if err != nil {
 		return err
 	}
-	r.httpResp.Body.Close()
 	return nil
 }
 
@@ -81,7 +81,7 @@ func (r *Response) MatchRawDocument(doc []byte) {
 
 // MatchJSONDocument checks whether the JSON response body matches the given document.
 func (r *Response) MatchJSONDocument(doc map[string]interface{}) {
-	resp := map[string]interface{}{}
+	resp := make(map[string]interface{})
 	if err := json.Unmarshal(r.body, &resp); err != nil {
 		r.reporter.Report(fmt.Errorf("could not decode JSON response body: %v", err))
 		return
@@ -106,7 +106,7 @@ func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
 // ContainsJSONValues checks that the JSON formated response body contains
 // specific values at given keys.
 func (r *Response) ContainsJSONValues(values map[string]interface{}) {
-	d := map[string]interface{}{}
+	d := make(map[string]interface{})
 	if err := json.NewDecoder(bytes.NewReader(r.body)).Decode(&d); err != nil {
 		r.reporter.Report(fmt.Errorf("could not decode JSON body: %v", err))
 		return

@@ -2,6 +2,7 @@ package httpexpect
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -116,21 +117,16 @@ func (s *Suite) Init(name string, n notifier.Notifier, opts ...RunOption) error 
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
 func (s *Suite) runTestWithRetry(t *test, n int, wait time.Duration) error {
-	var err error
-	for i := 0; i < n; i++ {
-		err = s.runTest(t)
+	for attempt := 1; ; attempt++ {
+		err := s.runTest(t)
 		if err == nil {
 			return nil
 		}
-		log.Error("run test error",
-			zap.String("name", t.Name),
-			zap.Error(err),
-			zap.Int("attempt", i+1),
-			zap.Int("max_attempt", n),
-			zap.Duration("backoff", wait*time.Duration(i+1)))
-		time.Sleep(wait * time.Duration(i+1))
+		if attempt > n {
+			return fmt.Errorf("could not run test after %d attempts: %v", n, err)
+		}
+		time.Sleep(wait * time.Duration(attempt))
 	}
-	return err
 }
 
 // Run runs all the tests in the suite.

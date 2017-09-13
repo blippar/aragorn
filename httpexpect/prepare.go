@@ -26,14 +26,13 @@ const (
 func (s *Suite) prepare() error {
 	var errs []string
 	if s.Base == nil {
-		errs = append(errs, "base is required")
-		return concatErrors(errs)
+		return errors.New("base is required")
 	}
 	if err := prepareBase(s.Base); err != nil {
 		errs = append(errs, err.Error())
 	}
 
-	if len(s.Tests) < 1 {
+	if len(s.Tests) == 0 {
 		errs = append(errs, "a tests suite must contain at least one test")
 		return concatErrors(errs)
 	}
@@ -45,21 +44,20 @@ func (s *Suite) prepare() error {
 }
 
 func prepareBase(b *base) error {
-	var errs []string
 	if b.URL == "" {
-		errs = append(errs, "base: URL is required")
+		return errors.New("base: URL is required")
 	} else if _, err := url.Parse(b.URL); err != nil {
-		errs = append(errs, "base: URL is invalid: "+err.Error())
+		return fmt.Errorf("base: URL is invalid: %v", err)
 	}
 
-	return concatErrors(errs)
+	return nil
 }
 
 func prepareTests(b *base, ts []test) error {
 	var errs []string
 	for _, t := range ts {
 		if err := prepareTest(b, &t); err != nil {
-			errs = append(errs, err.Error())
+			errs = append(errs, fmt.Sprintf("test %q:\n%v", t.Name, err))
 		}
 	}
 
@@ -71,13 +69,12 @@ func prepareTest(b *base, t *test) error {
 
 	// Request
 	if t.Request == nil {
-		errs = append(errs, fmt.Sprintf("test %q: request: field required", t.Name))
-		return concatErrors(errs)
+		return errors.New("- request: field required")
 	}
 
 	if t.Request.URL != "" {
 		if _, err := url.Parse(t.Request.URL); err != nil {
-			errs = append(errs, fmt.Sprintf("test%q: request: URL is invalid: %v", t.Name, err))
+			errs = append(errs, fmt.Sprintf("- request: URL is invalid: %v", err))
 		}
 	}
 
@@ -99,18 +96,18 @@ func prepareTest(b *base, t *test) error {
 		set++
 	}
 	if set > 1 {
-		errs = append(errs, fmt.Sprintf("test %q: request: at most one of body, multipart or formURLEncoded can be set at once", t.Name))
+		errs = append(errs, "- request: at most one of body, multipart or formURLEncoded can be set at once")
 	}
 
 	var err error
 	t.Request.httpReq, err = newHTTPRequest(b, t.Request)
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("test %q: request: could not create HTTP request: %v", t.Name, err))
+		errs = append(errs, fmt.Sprintf("- request: could not create HTTP request: %v", err))
 	}
 
 	// Expect
 	if t.Expect == nil {
-		errs = append(errs, fmt.Sprintf("test %q: request: field is required", t.Name))
+		errs = append(errs, "- request: field is required")
 		return concatErrors(errs)
 	}
 
@@ -119,10 +116,10 @@ func prepareTest(b *base, t *test) error {
 	}
 
 	if t.Expect.Document != nil && t.Expect.JSONSchema != nil {
-		errs = append(errs, fmt.Sprintf("test %q: expect: only one of document or schema can be set at once", t.Name))
+		errs = append(errs, "- expect: only one of document or schema can be set at once")
 	}
 	if t.Expect.Document != nil && t.Expect.JSONValues != nil {
-		errs = append(errs, fmt.Sprintf("test %q: expect: jsonValues can't be set with document", t.Name))
+		errs = append(errs, "- expect: jsonValues can't be set with document")
 	}
 
 	if t.Expect.Document != nil {
@@ -133,14 +130,14 @@ func prepareTest(b *base, t *test) error {
 			if bytes.HasPrefix(c, []byte("@")) {
 				t.Expect.rawDocument, err = ioutil.ReadFile(string(c[1:]))
 				if err != nil {
-					errs = append(errs, fmt.Sprintf("test %q: expect: could not read document: %v", t.Name, err))
+					errs = append(errs, fmt.Sprintf("- expect: could not read document: %v", err))
 				}
 			} else {
 				t.Expect.rawDocument = c
 			}
 		} else {
 			if err = json.Unmarshal(d, &t.Expect.jsonDocument); err != nil {
-				errs = append(errs, fmt.Sprintf("test %q: expect: could not decode expected document: %v", t.Name, err))
+				errs = append(errs, fmt.Sprintf("- expect: could not decode expected document: %v", err))
 			}
 		}
 	}
@@ -148,26 +145,28 @@ func prepareTest(b *base, t *test) error {
 	if t.Expect.JSONSchema != nil {
 		r, err := getReadCloser(t.Expect.JSONSchema)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("test %q: expect: could get reader for JSON schema: %v", t.Name, err))
-		}
-		defer r.Close()
-		cc := jsonschema.NewCompiler()
-		// NOTE: the parameter "schema.json" is not relevent.
-		cc.AddResource("schema.json", r)
-		t.Expect.jsonSchema, err = cc.Compile("schema.json")
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("test %q: expect: could not compile JSON schema: %v", t.Name, err))
+			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON schema: %v", err))
+		} else {
+			defer r.Close()
+			cc := jsonschema.NewCompiler()
+			// NOTE: the parameter "schema.json" is not relevent.
+			cc.AddResource("schema.json", r)
+			t.Expect.jsonSchema, err = cc.Compile("schema.json")
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("- expect: could not compile JSON schema: %v", err))
+			}
 		}
 	}
 
 	if t.Expect.JSONValues != nil {
 		r, err := getReadCloser(t.Expect.JSONValues)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("test %q: expect: could get reader for JSON values: %v", t.Name, err))
-		}
-		defer r.Close()
-		if err = json.NewDecoder(r).Decode(&t.Expect.jsonValues); err != nil {
-			errs = append(errs, fmt.Sprintf("test %q: expect: could decode expected JSON values: %v", t.Name, err))
+			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON values: %v", err))
+		} else {
+			defer r.Close()
+			if err = json.NewDecoder(r).Decode(&t.Expect.jsonValues); err != nil {
+				errs = append(errs, fmt.Sprintf("- expect: could decode expected JSON values: %v", err))
+			}
 		}
 	}
 
