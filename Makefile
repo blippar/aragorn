@@ -23,8 +23,8 @@ DOCKOPTS  += -q
 endif
 
 # Binary targets configuration
-TARGET     = aragorn
-GOPKGDIR   = ./
+TARGET     = ./bin/aragorn
+GOPKGDIR   = ./cmd/aragorn
 
 # Local meta targets
 all: $(TARGET)
@@ -33,7 +33,7 @@ all: $(TARGET)
 $(TARGET):
 	$(info >>> Building $@ from $(GOPKGDIR) using $(GOBIN))
 	$(if $(GOENV),$(info >>> with $(GOENV) and GOOPT=$(GOOPT)),)
-	$(GOENV) $(GOBIN) build $(GOOPT) -ldflags '$(GOLDF)' -o $@ $(GOPKGDIR)
+	$(GOENV) $(GOBIN) build $(GOOPT) -ldflags '$(GOLDF)' -o $(TARGET) $(GOPKGDIR)
 
 # Run tests using GOBIN
 test:

@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -40,7 +40,7 @@ type testSuiteConfig struct {
 
 // newTestSuiteFromDisk unmarshals the tests suite located at path
 // initializes it and adds it to the scheduler.
-func (s *service) newTestSuiteFromDisk(path string) error {
+func (s *Server) newTestSuiteFromDisk(path string) error {
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("could not read tests suite file: %v", err)
@@ -77,7 +77,7 @@ func (s *service) newTestSuiteFromDisk(path string) error {
 	return nil
 }
 
-func (s *service) newHTTPTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
+func (s *Server) newHTTPTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
 	var suite httpexpect.Suite
 	if err := json.Unmarshal(ts.Suite, &suite); err != nil {
 		return nil, fmt.Errorf("could not unmarshal HTTP tests suite: %v", err)
@@ -88,7 +88,7 @@ func (s *service) newHTTPTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
 	return &suite, nil
 }
 
-func (s *service) initHTTPTestSuite(cfg *testSuiteConfig, suite *httpexpect.Suite) error {
+func (s *Server) initHTTPTestSuite(cfg *testSuiteConfig, suite *httpexpect.Suite) error {
 	if err := suite.Init(
 		cfg.Name,
 		notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name),
@@ -100,7 +100,7 @@ func (s *service) initHTTPTestSuite(cfg *testSuiteConfig, suite *httpexpect.Suit
 	return nil
 }
 
-func (s *service) newGRPCTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
+func (s *Server) newGRPCTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
 	var suite grpcexpect.Suite
 	if err := json.Unmarshal(ts.Suite, &suite); err != nil {
 		return nil, fmt.Errorf("could not unmarshal gRPC tests suite: %v", err)
@@ -111,11 +111,11 @@ func (s *service) newGRPCTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
 	return &suite, nil
 }
 
-func (s *service) initGRPCTestSuite(suite *grpcexpect.Suite) error {
+func (s *Server) initGRPCTestSuite(suite *grpcexpect.Suite) error {
 	suite.Init(notifier.NewPrinter())
 	return nil
 }
 
-func (s *service) removeTestSuite(path string) {
+func (s *Server) removeTestSuite(path string) {
 	s.sch.Remove(path)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/blippar/aragorn/config"
 	"github.com/blippar/aragorn/log"
+	"github.com/blippar/aragorn/server"
 )
 
 func main() {
@@ -21,8 +22,8 @@ func main() {
 	}
 	defer log.L().Sync()
 
-	svc := newService(cfg)
-	if err := svc.start(); err != nil {
+	srv := server.New(cfg)
+	if err := srv.Start(); err != nil {
 		log.Fatal("can not start service", zap.Error(err))
 	}
 
@@ -30,7 +31,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-sigCh:
-		svc.stop()
-	case <-svc.wait():
+		srv.Stop()
+	case <-srv.Wait():
 	}
 }

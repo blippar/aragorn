@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"github.com/blippar/aragorn/scheduler"
 )
 
-type service struct {
+type Server struct {
 	cfg *config.Config
 	fsw *fsnotify.Watcher
 	sch *scheduler.Scheduler
@@ -24,8 +24,8 @@ type service struct {
 	errCh  chan error
 }
 
-func newService(cfg *config.Config) *service {
-	s := &service{
+func New(cfg *config.Config) *Server {
+	s := &Server{
 		cfg:   cfg,
 		sch:   &scheduler.Scheduler{},
 		errCh: make(chan error, 1),
@@ -34,7 +34,7 @@ func newService(cfg *config.Config) *service {
 	return s
 }
 
-func (s *service) start() error {
+func (s *Server) Start() error {
 	s.doneCh = make(chan struct{})
 	s.stopCh = make(chan struct{})
 
@@ -54,7 +54,7 @@ func (s *service) start() error {
 	return nil
 }
 
-func (s *service) stop() {
+func (s *Server) Stop() {
 	select {
 	case s.stopCh <- struct{}{}:
 		<-s.doneCh
@@ -62,7 +62,7 @@ func (s *service) stop() {
 	}
 }
 
-func (s *service) wait() <-chan struct{} {
+func (s *Server) Wait() <-chan struct{} {
 	return s.doneCh
 }
 
@@ -81,7 +81,7 @@ func newFSWatcher(cfg *config.Config) (*fsnotify.Watcher, error) {
 	return fsw, nil
 }
 
-func (s *service) run() {
+func (s *Server) run() {
 	go s.fsWatchEventLoop()
 	go s.fsWatchErrorLoop()
 	log.Info("started service")
@@ -101,21 +101,22 @@ func (s *service) run() {
 	log.Info("service stopped")
 }
 
-func (s *service) loadDirs() error {
-	walkFn := func(p string, info os.FileInfo, e error) error {
-		if strings.HasSuffix(p, ".suite.json") {
-			log.Info("loading tests suite", zap.String("file", p))
-			if err := s.newTestSuiteFromDisk(p); err != nil {
-				log.Error("could not load test suite", zap.String("file", p), zap.Error(err))
-			}
+func (s *Server) walkFn(p string, info os.FileInfo, e error) error {
+	if strings.HasSuffix(p, ".suite.json") {
+		log.Info("loading tests suite", zap.String("file", p))
+		if err := s.newTestSuiteFromDisk(p); err != nil {
+			log.Error("could not load test suite", zap.String("file", p), zap.Error(err))
 		}
-		return e
 	}
+	return e
+}
+
+func (s *Server) loadDirs() error {
 
 	log.Info("looking for existing tests suite files", zap.Strings("directories", s.cfg.Dirs))
 
 	for _, dir := range s.cfg.Dirs {
-		err := filepath.Walk(dir, walkFn)
+		err := filepath.Walk(dir, s.walkFn)
 		if err != nil {
 			return fmt.Errorf("could not walk dir %q: %v", dir, err)
 		}
@@ -123,7 +124,7 @@ func (s *service) loadDirs() error {
 	return nil
 }
 
-func (s *service) fsWatchEventLoop() {
+func (s *Server) fsWatchEventLoop() {
 	for e := range s.fsw.Events {
 		if strings.HasSuffix(e.Name, ".suite.json") {
 			switch {
@@ -160,7 +161,7 @@ func isWriteEvent(o fsnotify.Op) bool {
 	return o&fsnotify.Write == fsnotify.Write
 }
 
-func (s *service) fsWatchErrorLoop() {
+func (s *Server) fsWatchErrorLoop() {
 	for err := range s.fsw.Errors {
 		// NOTE: those errors might be fatal, so maybe its would
 		// be better to return the first error encountered instead
