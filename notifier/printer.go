@@ -32,6 +32,11 @@ func (r *Printer) Report(err error) {
 	r.failures = append(r.failures, err)
 }
 
+// Reportf implements the notifier interface.
+func (r *Printer) Reportf(format string, args ...interface{}) {
+	r.Report(fmt.Errorf(format, args...))
+}
+
 // TestError implements the Reporter interface.
 func (r *Printer) TestError(err error) {
 	r.err = err

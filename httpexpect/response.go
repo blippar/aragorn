@@ -3,7 +3,6 @@ package httpexpect
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -57,7 +56,7 @@ func (r *Response) readAndCloseBody() error {
 // StatusCode checks whether the response has the given status code.
 func (r *Response) StatusCode(code int) {
 	if r.httpResp.StatusCode != code {
-		r.reporter.Report(fmt.Errorf("wrong http status code (got %d; expected %d)", r.httpResp.StatusCode, code))
+		r.reporter.Reportf("wrong http status code (got %d; expected %d)", r.httpResp.StatusCode, code)
 	}
 }
 
@@ -65,9 +64,9 @@ func (r *Response) StatusCode(code int) {
 func (r *Response) ContainsHeaders(h headers) {
 	for k, v := range h {
 		if val := r.httpResp.Header.Get(k); val == "" {
-			r.reporter.Report(fmt.Errorf("missing header %s", k))
+			r.reporter.Reportf("missing header %s", k)
 		} else if val != v {
-			r.reporter.Report(fmt.Errorf("wrong value for header %q (got %q; expected %q)", k, val, v))
+			r.reporter.Reportf("wrong value for header %q (got %q; expected %q)", k, val, v)
 		}
 	}
 }
@@ -75,7 +74,7 @@ func (r *Response) ContainsHeaders(h headers) {
 // MatchRawDocument checks whether the raw response body matches the given document.
 func (r *Response) MatchRawDocument(doc []byte) {
 	if !cmp.Equal(r.body, doc) {
-		r.reporter.Report(fmt.Errorf("request body does not match document"))
+		r.reporter.Reportf("request body does not match document")
 	}
 }
 
@@ -83,12 +82,12 @@ func (r *Response) MatchRawDocument(doc []byte) {
 func (r *Response) MatchJSONDocument(doc map[string]interface{}) {
 	resp := make(map[string]interface{})
 	if err := json.Unmarshal(r.body, &resp); err != nil {
-		r.reporter.Report(fmt.Errorf("could not decode JSON response body: %v", err))
+		r.reporter.Reportf("could not decode JSON response body: %v", err)
 		return
 	}
 
 	if !cmp.Equal(resp, doc) {
-		r.reporter.Report(fmt.Errorf("request body does not match document"))
+		r.reporter.Reportf("request body does not match document")
 	}
 }
 
@@ -96,9 +95,9 @@ func (r *Response) MatchJSONDocument(doc map[string]interface{}) {
 func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
 	if err := schema.Validate(bytes.NewReader(r.body)); err != nil {
 		if e, ok := err.(*jsonschema.ValidationError); ok {
-			r.reporter.Report(fmt.Errorf("wrong JSON schema: %v", e))
+			r.reporter.Reportf("wrong JSON schema: %v", e)
 		} else {
-			r.reporter.Report(fmt.Errorf("JSON schema validation failed: %v", err))
+			r.reporter.Reportf("JSON schema validation failed: %v", err)
 		}
 	}
 }
@@ -108,7 +107,7 @@ func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
 func (r *Response) ContainsJSONValues(values map[string]interface{}) {
 	d := make(map[string]interface{})
 	if err := json.NewDecoder(bytes.NewReader(r.body)).Decode(&d); err != nil {
-		r.reporter.Report(fmt.Errorf("could not decode JSON body: %v", err))
+		r.reporter.Reportf("could not decode JSON body: %v", err)
 		return
 	}
 
@@ -117,12 +116,12 @@ func (r *Response) ContainsJSONValues(values map[string]interface{}) {
 	for key, expected := range values {
 		val, err := jq.Interface(strings.Split(key, ".")...)
 		if err != nil {
-			r.reporter.Report(fmt.Errorf("missing JSON key: %q", key))
+			r.reporter.Reportf("missing JSON key: %q", key)
 			continue
 		}
 
 		if !cmp.Equal(val, expected) {
-			r.reporter.Report(fmt.Errorf("wrong value for key %q (got %v; want %v)", key, val, expected))
+			r.reporter.Reportf("wrong value for key %q (got %v; want %v)", key, val, expected)
 		}
 	}
 }
