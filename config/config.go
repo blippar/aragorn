@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Dirs     []string
 	Humanize bool
+	RunOnce  bool
 }
 
 // LoadFromFile loads the configuration from a JSON file named by filename.
@@ -35,11 +36,13 @@ func FromArgs() *Config {
 	}
 
 	humanize := flag.Bool("humanize", false, "humanize logs")
+	runOnce := flag.Bool("run-once", false, "run all the tests only once and exits")
 	flag.Parse()
 
 	cfg := &Config{
 		Dirs:     flag.Args(),
 		Humanize: *humanize,
+		RunOnce:  *runOnce,
 	}
 	return cfg
 }

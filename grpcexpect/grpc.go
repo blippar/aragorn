@@ -13,8 +13,9 @@ type Suite struct {
 }
 
 // Init initializes a gRPC tests suite.
-func (s *Suite) Init(n notifier.Notifier) {
+func (s *Suite) Init(n notifier.Notifier) error {
 	s.notifier = n
+	return nil
 }
 
 // Run runs all the tests in the suite.

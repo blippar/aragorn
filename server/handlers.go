@@ -39,8 +39,9 @@ type testSuiteConfig struct {
 }
 
 // newTestSuiteFromDisk unmarshals the tests suite located at path
-// initializes it and adds it to the scheduler.
-func (s *Server) newTestSuiteFromDisk(path string) error {
+// initializes it. If schedule is set to true, it also adds it to the scheduler.
+// Otherwise, the tests suite is executed only once without delay.
+func (s *Server) newTestSuiteFromDisk(path string, schedule bool) error {
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("could not read tests suite file: %v", err)
@@ -64,14 +65,18 @@ func (s *Server) newTestSuiteFromDisk(path string) error {
 		return err
 	}
 
-	if ts.RunCron != "" {
-		s.sch.AddCron(path, job, ts.RunCron)
-	} else if ts.RunEvery != "" {
-		d, err := time.ParseDuration(ts.RunEvery)
-		if err != nil {
-			return fmt.Errorf("could not parse duration in tests suite file: %v", err)
+	if schedule {
+		if ts.RunCron != "" {
+			s.sch.AddCron(path, job, ts.RunCron)
+		} else if ts.RunEvery != "" {
+			d, err := time.ParseDuration(ts.RunEvery)
+			if err != nil {
+				return fmt.Errorf("could not parse duration in tests suite file: %v", err)
+			}
+			s.sch.Add(path, job, d)
 		}
-		s.sch.Add(path, job, d)
+	} else {
+		job.Run()
 	}
 
 	return nil
@@ -82,22 +87,17 @@ func (s *Server) newHTTPTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
 	if err := json.Unmarshal(ts.Suite, &suite); err != nil {
 		return nil, fmt.Errorf("could not unmarshal HTTP tests suite: %v", err)
 	}
-	if err := s.initHTTPTestSuite(&ts.testSuiteConfig, &suite); err != nil {
-		return nil, fmt.Errorf("could not init HTTP tests suite: %v", err)
-	}
-	return &suite, nil
-}
 
-func (s *Server) initHTTPTestSuite(cfg *testSuiteConfig, suite *httpexpect.Suite) error {
+	cfg := ts.testSuiteConfig
 	if err := suite.Init(
 		cfg.Name,
 		notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name),
 		httpexpect.WithHTTPClient(&http.Client{Timeout: 20 * time.Second}),
 		httpexpect.WithRetryPolicy(3, 15*time.Second),
 	); err != nil {
-		return err
+		return nil, fmt.Errorf("could not init HTTP tests suite: %v", err)
 	}
-	return nil
+	return &suite, nil
 }
 
 func (s *Server) newGRPCTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
@@ -105,15 +105,12 @@ func (s *Server) newGRPCTestSuite(ts *jsonTestSuite) (scheduler.Job, error) {
 	if err := json.Unmarshal(ts.Suite, &suite); err != nil {
 		return nil, fmt.Errorf("could not unmarshal gRPC tests suite: %v", err)
 	}
-	if err := s.initGRPCTestSuite(&suite); err != nil {
+	if err := suite.Init(
+		notifier.NewPrinter(),
+	); err != nil {
 		return nil, fmt.Errorf("could not init gRPC tests suite: %v", err)
 	}
 	return &suite, nil
-}
-
-func (s *Server) initGRPCTestSuite(suite *grpcexpect.Suite) error {
-	suite.Init(notifier.NewPrinter())
-	return nil
 }
 
 func (s *Server) removeTestSuite(path string) {

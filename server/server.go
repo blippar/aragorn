@@ -38,13 +38,18 @@ func (s *Server) Start() error {
 	s.doneCh = make(chan struct{})
 	s.stopCh = make(chan struct{})
 
-	var err error
-	s.fsw, err = newFSWatcher(s.cfg)
-	if err != nil {
+	if err := s.loadDirs(); err != nil {
 		return err
 	}
 
-	if err := s.loadDirs(); err != nil {
+	if s.cfg.RunOnce {
+		close(s.doneCh)
+		return nil
+	}
+
+	var err error
+	s.fsw, err = newFSWatcher(s.cfg)
+	if err != nil {
 		return err
 	}
 
@@ -84,13 +89,13 @@ func newFSWatcher(cfg *config.Config) (*fsnotify.Watcher, error) {
 func (s *Server) run() {
 	go s.fsWatchEventLoop()
 	go s.fsWatchErrorLoop()
-	log.Info("started service")
+	log.Info("started server")
 
 	select {
 	case err := <-s.errCh:
-		log.Error("service stopping after fatal error", zap.Error(err))
+		log.Error("server stopping after fatal error", zap.Error(err))
 	case <-s.stopCh:
-		log.Info("service received stop signal")
+		log.Info("server received stop signal")
 	}
 
 	s.sch.Stop()
@@ -98,13 +103,13 @@ func (s *Server) run() {
 		log.Error("inotify close error", zap.Error(err))
 	}
 	close(s.doneCh)
-	log.Info("service stopped")
+	log.Info("server stopped")
 }
 
 func (s *Server) walkFn(p string, info os.FileInfo, e error) error {
 	if strings.HasSuffix(p, ".suite.json") {
 		log.Info("loading tests suite", zap.String("file", p))
-		if err := s.newTestSuiteFromDisk(p); err != nil {
+		if err := s.newTestSuiteFromDisk(p, !s.cfg.RunOnce); err != nil {
 			log.Error("could not load test suite", zap.String("file", p), zap.Error(err))
 		}
 	}
@@ -112,7 +117,6 @@ func (s *Server) walkFn(p string, info os.FileInfo, e error) error {
 }
 
 func (s *Server) loadDirs() error {
-
 	log.Info("looking for existing tests suite files", zap.Strings("directories", s.cfg.Dirs))
 
 	for _, dir := range s.cfg.Dirs {
@@ -130,7 +134,7 @@ func (s *Server) fsWatchEventLoop() {
 			switch {
 			case isCreateEvent(e.Op):
 				log.Info("new tests suite", zap.String("file", e.Name))
-				if err := s.newTestSuiteFromDisk(e.Name); err != nil {
+				if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
 					log.Error("could not create tests suite from disk", zap.Error(err))
 					break
 				}
@@ -140,7 +144,7 @@ func (s *Server) fsWatchEventLoop() {
 			case isWriteEvent(e.Op):
 				log.Info("tests suite changed", zap.String("file", e.Name))
 				s.removeTestSuite(e.Name)
-				if err := s.newTestSuiteFromDisk(e.Name); err != nil {
+				if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
 					log.Error("could not create tests suite from disk", zap.Error(err))
 					break
 				}
