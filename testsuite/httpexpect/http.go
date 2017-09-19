@@ -12,6 +12,8 @@ import (
 
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/notifier"
+	"github.com/blippar/aragorn/scheduler"
+	"github.com/blippar/aragorn/testsuite"
 )
 
 const (
@@ -142,4 +144,26 @@ func (s *Suite) Run() {
 	}
 	s.notifier.SuiteDone()
 	log.Info("ran tests suite", zap.String("name", s.name), zap.Duration("took", time.Since(start)))
+}
+
+func init() {
+	f := testsuite.RegisterFunc(func(cfg *testsuite.Config) (scheduler.Job, error) {
+		var suite Suite
+		if err := json.Unmarshal(cfg.Suite, &suite); err != nil {
+			return nil, fmt.Errorf("could not unmarshal HTTP tests suite: %v", err)
+		}
+
+		if err := suite.Init(
+			cfg.Name,
+			notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name),
+			WithHTTPClient(&http.Client{Timeout: 20 * time.Second}),
+			WithRetryPolicy(1, 1*time.Second),
+		); err != nil {
+			return nil, fmt.Errorf("could not init HTTP tests suite: %v", err)
+		}
+
+		return &suite, nil
+	})
+
+	testsuite.Register("HTTP", f)
 }
