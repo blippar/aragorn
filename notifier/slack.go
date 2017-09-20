@@ -87,8 +87,8 @@ func (r *SlackNotifier) Report(err error) {
 	r.currentRes.failures = append(r.currentRes.failures, err)
 }
 
-// Reportf implements the Notifier interface.
-func (r *SlackNotifier) Reportf(format string, args ...interface{}) {
+// Errorf implements the Notifier interface.
+func (r *SlackNotifier) Errorf(format string, args ...interface{}) {
 	r.Report(fmt.Errorf(format, args...))
 }
 
