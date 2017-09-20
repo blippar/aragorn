@@ -3,6 +3,10 @@ package notifier
 import (
 	"fmt"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/blippar/aragorn/log"
 )
 
 var _ = Notifier(&Printer{})
@@ -46,15 +50,12 @@ func (r *Printer) TestError(err error) {
 func (r *Printer) AfterTest() {
 	if len(r.failures) > 0 || r.err != nil {
 		if r.err != nil {
-			fmt.Println(r.err.Error())
+			log.Info("could not run test", zap.String("name", r.name), zap.Duration("took", time.Since(r.start)), zap.Error(r.err))
 		} else {
-			for _, err := range r.failures {
-				fmt.Println(err.Error())
-			}
+			log.Info("test failed", zap.String("name", r.name), zap.Duration("took", time.Since(r.start)), zap.Errors("failures", r.failures))
 		}
-		fmt.Printf("[%s] FAILED (%v)\n", r.name, time.Since(r.start))
 	} else {
-		fmt.Printf("[%s] PASS (%v)\n", r.name, time.Since(r.start))
+		log.Info("test passed", zap.String("name", r.name), zap.Duration("took", time.Since(r.start)))
 	}
 	r.failures = nil
 	r.err = nil
