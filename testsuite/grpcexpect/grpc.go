@@ -33,9 +33,14 @@ func init() {
 			return nil, fmt.Errorf("could not unmarshal gRPC test suite: %v", err)
 		}
 
-		if err := suite.Init(
-			notifier.NewPrinter(),
-		); err != nil {
+		var n notifier.Notifier
+		if cfg.SlackWebhook != "" {
+			n = notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name)
+		} else {
+			n = notifier.NewPrinter()
+		}
+
+		if err := suite.Init(n); err != nil {
 			return nil, fmt.Errorf("could not init gRPC test suite: %v", err)
 		}
 

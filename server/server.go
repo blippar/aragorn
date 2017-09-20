@@ -27,7 +27,7 @@ type Server struct {
 func New(cfg *config.Config) *Server {
 	s := &Server{
 		cfg:   cfg,
-		sch:   &scheduler.Scheduler{},
+		sch:   scheduler.New(),
 		errCh: make(chan error, 1),
 	}
 

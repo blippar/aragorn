@@ -21,6 +21,12 @@ type Scheduler struct {
 	mu sync.Mutex
 }
 
+func New() *Scheduler {
+	return &Scheduler{
+		jobs: make(map[string]*job),
+	}
+}
+
 func (s *Scheduler) Start() {
 	s.running = true
 	for _, j := range s.jobs {
@@ -43,10 +49,6 @@ func (s *Scheduler) Add(name string, j Job, interval time.Duration) error {
 		return ErrJobAlreadyExist
 	}
 
-	if s.jobs == nil {
-		s.jobs = make(map[string]*job)
-	}
-
 	job := &job{
 		job:      j,
 		interval: interval,
@@ -66,10 +68,6 @@ func (s *Scheduler) AddCron(name string, j Job, expr string) error {
 
 	if _, ok := s.jobs[name]; ok {
 		return ErrJobAlreadyExist
-	}
-
-	if s.jobs == nil {
-		s.jobs = make(map[string]*job)
 	}
 
 	cronExpr, err := cronexpr.Parse(expr)

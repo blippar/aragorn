@@ -153,12 +153,14 @@ func init() {
 			return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
 		}
 
-		if err := suite.Init(
-			cfg.Name,
-			notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name),
-			WithHTTPClient(&http.Client{Timeout: 20 * time.Second}),
-			WithRetryPolicy(1, 1*time.Second),
-		); err != nil {
+		var n notifier.Notifier
+		if cfg.SlackWebhook != "" {
+			n = notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name)
+		} else {
+			n = notifier.NewPrinter()
+		}
+
+		if err := suite.Init(cfg.Name, n); err != nil {
 			return nil, fmt.Errorf("could not init HTTP test suite: %v", err)
 		}
 

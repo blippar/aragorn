@@ -14,7 +14,11 @@ import (
 )
 
 func main() {
-	cfg := config.FromArgs()
+	cfg, err := config.FromArgs()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	if err := log.Init(cfg.Humanize); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -23,7 +27,7 @@ func main() {
 	defer log.L().Sync()
 
 	srv := server.New(cfg)
-	if err := srv.Start(); err != nil {
+	if err = srv.Start(); err != nil {
 		log.Fatal("can not start service", zap.Error(err))
 	}
 
