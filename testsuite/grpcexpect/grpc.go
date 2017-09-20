@@ -10,12 +10,12 @@ import (
 	"github.com/blippar/aragorn/testsuite"
 )
 
-// Suite describes a GRPC tests suite.
+// Suite describes a GRPC test suite.
 type Suite struct {
 	notifier notifier.Notifier
 }
 
-// Init initializes a gRPC tests suite.
+// Init initializes a gRPC test suite.
 func (s *Suite) Init(n notifier.Notifier) error {
 	s.notifier = n
 	return nil
@@ -30,13 +30,13 @@ func init() {
 	f := testsuite.RegisterFunc(func(cfg *testsuite.Config) (scheduler.Job, error) {
 		var suite Suite
 		if err := json.Unmarshal(cfg.Suite, &suite); err != nil {
-			return nil, fmt.Errorf("could not unmarshal gRPC tests suite: %v", err)
+			return nil, fmt.Errorf("could not unmarshal gRPC test suite: %v", err)
 		}
 
 		if err := suite.Init(
 			notifier.NewPrinter(),
 		); err != nil {
-			return nil, fmt.Errorf("could not init gRPC tests suite: %v", err)
+			return nil, fmt.Errorf("could not init gRPC test suite: %v", err)
 		}
 
 		return &suite, nil

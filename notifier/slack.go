@@ -71,39 +71,39 @@ func (t *testResult) hasError() bool {
 	return t.err != nil
 }
 
-// NewSlackNotifier returns a new SlackNotifier given a Slack webhook and a tests suite name.
+// NewSlackNotifier returns a new SlackNotifier given a Slack webhook and a test suite name.
 func NewSlackNotifier(webhook, name string) *SlackNotifier {
 	return &SlackNotifier{webhook: webhook, suiteName: name}
 }
 
-// BeforeTest implements the notifier interface.
+// BeforeTest implements the Notifier interface.
 func (r *SlackNotifier) BeforeTest(name string) {
 	r.start = time.Now()
 	r.currentRes = testResult{name: name}
 }
 
-// Report implements the notifier interface.
+// Report implements the Notifier interface.
 func (r *SlackNotifier) Report(err error) {
 	r.currentRes.failures = append(r.currentRes.failures, err)
 }
 
-// Reportf implements the notifier interface.
+// Reportf implements the Notifier interface.
 func (r *SlackNotifier) Reportf(format string, args ...interface{}) {
 	r.Report(fmt.Errorf(format, args...))
 }
 
-// TestError implements the notifier interface.
+// TestError implements the Notifier interface.
 func (r *SlackNotifier) TestError(err error) {
 	r.currentRes.err = err
 }
 
-// AfterTest implements the notifier interface.
+// AfterTest implements the Notifier interface.
 func (r *SlackNotifier) AfterTest() {
 	r.currentRes.duration = time.Since(r.start)
 	r.results = append(r.results, r.currentRes)
 }
 
-// SuiteDone implements the notifier interface.
+// SuiteDone implements the Notifier interface.
 func (r *SlackNotifier) SuiteDone() {
 	failures := 0
 	errors := 0

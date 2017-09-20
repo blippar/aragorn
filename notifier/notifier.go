@@ -2,7 +2,7 @@ package notifier
 
 import "github.com/blippar/aragorn/reporter"
 
-// Notifier is a set of methods called at specific steps duting a tests suite run.
+// Notifier is a set of methods called at specific steps duting a test suite run.
 type Notifier interface {
 	reporter.Reporter
 
@@ -15,6 +15,6 @@ type Notifier interface {
 	// Report is called after each test run.
 	AfterTest()
 
-	// Done is called when the complete tests suite is done.
+	// Done is called when the complete test suite is done.
 	SuiteDone()
 }

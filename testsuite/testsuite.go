@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	// Name used to identify this tests suite.
+	// Name used to identify this test suite.
 	Name string
 
 	RunEvery string // parsable by time.ParseDuration
@@ -16,10 +16,10 @@ type Config struct {
 
 	SlackWebhook string
 
-	// Type of the tests suite, can be HTTP or GRPC.
+	// Type of the test suite, can be HTTP or GRPC.
 	Type string
 
-	// Description of the tests suite, depends on Type.
+	// Description of the test suite, depends on Type.
 	Suite json.RawMessage
 }
 
@@ -34,7 +34,7 @@ func init() {
 func CreateJob(cfg *Config) (scheduler.Job, error) {
 	fn, ok := m[cfg.Type]
 	if !ok {
-		return nil, fmt.Errorf("unsupported tests suite type: %q", cfg.Type)
+		return nil, fmt.Errorf("unsupported test suite type: %q", cfg.Type)
 	}
 
 	return fn(cfg)

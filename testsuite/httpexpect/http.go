@@ -21,7 +21,7 @@ const (
 	defaultRetryWait  = 30 * time.Second
 )
 
-// Suite describes an HTTP tests suite.
+// Suite describes an HTTP test suite.
 type Suite struct {
 	Base  *base
 	Tests []test
@@ -97,7 +97,7 @@ func WithRetryPolicy(n int, wait time.Duration) RunOption {
 	}
 }
 
-// Init initializes an HTTP tests suite.
+// Init initializes an HTTP test suite.
 func (s *Suite) Init(name string, n notifier.Notifier, opts ...RunOption) error {
 	s.name = name
 	s.notifier = n
@@ -133,7 +133,7 @@ func (s *Suite) runTestWithRetry(t *test, n int, wait time.Duration) error {
 
 // Run runs all the tests in the suite.
 func (s *Suite) Run() {
-	log.Info("running tests suite", zap.String("name", s.name))
+	log.Info("running test suite", zap.String("name", s.name))
 	start := time.Now()
 	for _, t := range s.Tests {
 		s.notifier.BeforeTest(t.Name)
@@ -143,14 +143,14 @@ func (s *Suite) Run() {
 		s.notifier.AfterTest()
 	}
 	s.notifier.SuiteDone()
-	log.Info("ran tests suite", zap.String("name", s.name), zap.Duration("took", time.Since(start)))
+	log.Info("ran test suite", zap.String("name", s.name), zap.Duration("took", time.Since(start)))
 }
 
 func init() {
 	f := testsuite.RegisterFunc(func(cfg *testsuite.Config) (scheduler.Job, error) {
 		var suite Suite
 		if err := json.Unmarshal(cfg.Suite, &suite); err != nil {
-			return nil, fmt.Errorf("could not unmarshal HTTP tests suite: %v", err)
+			return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
 		}
 
 		if err := suite.Init(
@@ -159,7 +159,7 @@ func init() {
 			WithHTTPClient(&http.Client{Timeout: 20 * time.Second}),
 			WithRetryPolicy(1, 1*time.Second),
 		); err != nil {
-			return nil, fmt.Errorf("could not init HTTP tests suite: %v", err)
+			return nil, fmt.Errorf("could not init HTTP test suite: %v", err)
 		}
 
 		return &suite, nil

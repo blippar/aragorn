@@ -21,13 +21,13 @@ func NewPrinter() *Printer {
 	return &Printer{}
 }
 
-// BeforeTest implements the Reporter interface.
+// BeforeTest implements the Notifier interface.
 func (r *Printer) BeforeTest(name string) {
 	r.name = name
 	r.start = time.Now()
 }
 
-// Report implements the Reporter interface.
+// Report implements the Notifier interface.
 func (r *Printer) Report(err error) {
 	r.failures = append(r.failures, err)
 }
@@ -37,12 +37,12 @@ func (r *Printer) Reportf(format string, args ...interface{}) {
 	r.Report(fmt.Errorf(format, args...))
 }
 
-// TestError implements the Reporter interface.
+// TestError implements the Notifier interface.
 func (r *Printer) TestError(err error) {
 	r.err = err
 }
 
-// AfterTest implements the Reporter interface.
+// AfterTest implements the Notifier interface.
 func (r *Printer) AfterTest() {
 	if len(r.failures) > 0 || r.err != nil {
 		if r.err != nil {
@@ -60,6 +60,6 @@ func (r *Printer) AfterTest() {
 	r.err = nil
 }
 
-// SuiteDone implements the Reporter interface.
+// SuiteDone implements the Notifier interface.
 func (r *Printer) SuiteDone() {
 }

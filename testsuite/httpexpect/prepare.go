@@ -21,7 +21,7 @@ const (
 	defaultExpectedStatusCode = http.StatusOK
 )
 
-// prepare verifies that an HTTP tests suite is valid. It also create the HTTP requests,
+// prepare verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
 func (s *Suite) prepare() error {
 	var errs []string
@@ -33,7 +33,7 @@ func (s *Suite) prepare() error {
 	}
 
 	if len(s.Tests) == 0 {
-		errs = append(errs, "a tests suite must contain at least one test")
+		errs = append(errs, "a test suite must contain at least one test")
 		return concatErrors(errs)
 	}
 	if err := prepareTests(s.Base, s.Tests); err != nil {

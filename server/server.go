@@ -108,7 +108,7 @@ func (s *Server) run() {
 
 func (s *Server) walkFn(p string, info os.FileInfo, e error) error {
 	if strings.HasSuffix(p, ".suite.json") {
-		log.Info("loading tests suite", zap.String("file", p))
+		log.Info("loading test suite", zap.String("file", p))
 		if err := s.newTestSuiteFromDisk(p, !s.cfg.RunOnce); err != nil {
 			log.Error("could not load test suite", zap.String("file", p), zap.Error(err))
 		}
@@ -117,7 +117,7 @@ func (s *Server) walkFn(p string, info os.FileInfo, e error) error {
 }
 
 func (s *Server) loadDirs() error {
-	log.Info("looking for existing tests suite files", zap.Strings("directories", s.cfg.Dirs))
+	log.Info("looking for existing test suite files", zap.Strings("directories", s.cfg.Dirs))
 
 	for _, dir := range s.cfg.Dirs {
 		err := filepath.Walk(dir, s.walkFn)
@@ -133,19 +133,19 @@ func (s *Server) fsWatchEventLoop() {
 		if strings.HasSuffix(e.Name, ".suite.json") {
 			switch {
 			case isCreateEvent(e.Op):
-				log.Info("new tests suite", zap.String("file", e.Name))
+				log.Info("new test suite", zap.String("file", e.Name))
 				if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
-					log.Error("could not create tests suite from disk", zap.Error(err))
+					log.Error("could not create test suite from disk", zap.Error(err))
 					break
 				}
 			case isRenameEvent(e.Op):
-				log.Info("removing tests suite", zap.String("file", e.Name))
+				log.Info("removing test suite", zap.String("file", e.Name))
 				s.removeTestSuite(e.Name)
 			case isWriteEvent(e.Op):
-				log.Info("tests suite changed", zap.String("file", e.Name))
+				log.Info("test suite changed", zap.String("file", e.Name))
 				s.removeTestSuite(e.Name)
 				if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
-					log.Error("could not create tests suite from disk", zap.Error(err))
+					log.Error("could not create test suite from disk", zap.Error(err))
 					break
 				}
 			}

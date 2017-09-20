@@ -9,18 +9,18 @@ import (
 	"github.com/blippar/aragorn/testsuite"
 )
 
-// newTestSuiteFromDisk unmarshals the tests suite located at path
+// newTestSuiteFromDisk unmarshals the test suite located at path
 // initializes it. If schedule is set to true, it also adds it to the scheduler.
-// Otherwise, the tests suite is executed only once without delay.
+// Otherwise, the test suite is executed only once without delay.
 func (s *Server) newTestSuiteFromDisk(path string, schedule bool) error {
 	d, err := ioutil.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("could not read tests suite file: %v", err)
+		return fmt.Errorf("could not read test suite file: %v", err)
 	}
 
 	var cfg testsuite.Config
 	if err = json.Unmarshal(d, &cfg); err != nil {
-		return fmt.Errorf("could not unmarshal tests suite file: %v", err)
+		return fmt.Errorf("could not unmarshal test suite file: %v", err)
 	}
 
 	job, err := testsuite.CreateJob(&cfg)
@@ -34,7 +34,7 @@ func (s *Server) newTestSuiteFromDisk(path string, schedule bool) error {
 		} else if cfg.RunEvery != "" {
 			d, err := time.ParseDuration(cfg.RunEvery)
 			if err != nil {
-				return fmt.Errorf("could not parse duration in tests suite file: %v", err)
+				return fmt.Errorf("could not parse duration in test suite file: %v", err)
 			}
 			s.sch.Add(path, job, d)
 		}
