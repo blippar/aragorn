@@ -138,7 +138,7 @@ func (s *Server) fsWatchEventLoop() {
 					log.Error("could not create test suite from disk", zap.Error(err))
 					break
 				}
-			case isRenameEvent(e.Op):
+			case isRenameEvent(e.Op) || isRemoveEvent(e.Op):
 				log.Info("removing test suite", zap.String("file", e.Name))
 				s.removeTestSuite(e.Name)
 			case isWriteEvent(e.Op):
@@ -163,6 +163,10 @@ func isRenameEvent(o fsnotify.Op) bool {
 
 func isWriteEvent(o fsnotify.Op) bool {
 	return o&fsnotify.Write == fsnotify.Write
+}
+
+func isRemoveEvent(o fsnotify.Op) bool {
+	return o&fsnotify.Remove == fsnotify.Remove
 }
 
 func (s *Server) fsWatchErrorLoop() {
