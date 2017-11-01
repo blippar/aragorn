@@ -11,6 +11,9 @@ import (
 	"github.com/blippar/aragorn/config"
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/server"
+
+	_ "github.com/blippar/aragorn/testsuite/grpcexpect"
+	_ "github.com/blippar/aragorn/testsuite/httpexpect"
 )
 
 func main() {

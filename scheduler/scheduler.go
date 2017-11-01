@@ -10,10 +10,12 @@ import (
 
 // Errors.
 var (
-	ErrJobAlreadyExist = errors.New("job already exist")
 	ErrInvalidCronExpr = errors.New("invalid cron expression")
+	ErrJobAlreadyExist = errors.New("job already exist")
+	ErrJobNotFound     = errors.New("job not found")
 )
 
+// Scheduler schedules jobs to run them at a given interval.
 type Scheduler struct {
 	jobs    map[string]*job
 	running bool
@@ -21,12 +23,14 @@ type Scheduler struct {
 	mu sync.Mutex
 }
 
+// New returns a scheduler.
 func New() *Scheduler {
 	return &Scheduler{
 		jobs: make(map[string]*job),
 	}
 }
 
+// Start starts the scheduler.
 func (s *Scheduler) Start() {
 	s.running = true
 	for _, j := range s.jobs {
@@ -34,6 +38,7 @@ func (s *Scheduler) Start() {
 	}
 }
 
+// Stop stops the scheduler.
 func (s *Scheduler) Stop() {
 	for _, j := range s.jobs {
 		j.cancel()
@@ -41,6 +46,8 @@ func (s *Scheduler) Stop() {
 	s.running = false
 }
 
+// Add adds a job in the scheduler. The job runs every interval duration
+// when the scheduler is started or already running.
 func (s *Scheduler) Add(name string, j Job, interval time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -62,6 +69,8 @@ func (s *Scheduler) Add(name string, j Job, interval time.Duration) error {
 	return nil
 }
 
+// AddCron adds the job in the scheduler. The job will be run depending of the cron expression
+// when the scheduler is started or already running.
 func (s *Scheduler) AddCron(name string, j Job, expr string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -88,15 +97,17 @@ func (s *Scheduler) AddCron(name string, j Job, expr string) error {
 	return nil
 }
 
-func (s *Scheduler) Remove(name string) {
+// Remove removes the job from the scheduler.
+func (s *Scheduler) Remove(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	j, ok := s.jobs[name]
 	if !ok {
-		return
+		return ErrJobNotFound
 	}
 
 	j.cancel()
 	delete(s.jobs, name)
+	return nil
 }

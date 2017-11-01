@@ -1,18 +1,15 @@
 package httpexpect
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/santhosh-tekuri/jsonschema"
-	"go.uber.org/zap"
 
-	"github.com/blippar/aragorn/log"
-	"github.com/blippar/aragorn/notifier"
-	"github.com/blippar/aragorn/scheduler"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -23,64 +20,57 @@ const (
 
 // Suite describes an HTTP test suite.
 type Suite struct {
-	Base  *base
-	Tests []test
+	tests []*test
 
-	name       string
 	client     *http.Client
 	retryCount int
 	retryWait  time.Duration
-	notifier   notifier.Notifier
-}
-
-type base struct {
-	URL     string  // Base URL prepended to all requests' path.
-	Headers headers // Base set of headers added to all requests.
 }
 
 type test struct {
-	Name    string   // Name used to identify this test.
-	Request *request // Request describes the HTTP request.
-	Expect  *expect  // Expect describes the result of the HTTP request.
-}
+	name string
+	req  *http.Request // Raw HTTP request generated from the request description.
+	body []byte        // Bytes buffer from which the httpReq Body will be read from on each request.
 
-type request struct {
-	URL     string // If set, will overwrite the base URL.
-	Path    string
-	Method  string
-	Headers headers
+	statusCode int
+	header     Header
 
-	// Only one of the three following must be set.
-	Body           json.RawMessage
-	Multipart      multipartContent
-	FormURLEncoded url.Values
-
-	httpReq  *http.Request // Raw HTTP request generated from the request description.
-	httpBody []byte        // Bytes buffer from which the httpReq Body will be read from on each request.
-}
-
-type expect struct {
-	StatusCode int
-	Headers    headers
-
-	Document     json.RawMessage        // Exact document to match. Exclusive with JSONSchema.
-	jsonDocument map[string]interface{} // Decoded JSONDocument.
 	rawDocument  []byte                 // Raw document
+	jsonDocument map[string]interface{} // Decoded json document.
 
-	JSONSchema json.RawMessage    // Exact JSON schema to match. Exclusive with Document.
-	jsonSchema *jsonschema.Schema // Compiled JSONSchema.
-
-	JSONValues json.RawMessage        // Required JSON values. Optional, if JSONSchema is set.
+	jsonSchema *jsonschema.Schema     // Compiled jsonschema.
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
 
-type (
-	headers          map[string]string
-	multipartContent map[string]string
+// RunOption is a function that configures a Suite.
+type RunOption func(*Suite)
 
-	// RunOption is a function that configures a Suite.
-	RunOption func(*Suite)
-)
+// New returns a Suite.
+func New(cfg *Config, opts ...RunOption) (*Suite, error) {
+	tests, err := cfg.genTests()
+	if err != nil {
+		return nil, err
+	}
+	s := &Suite{
+		tests: tests,
+
+		retryCount: defaultRetryCount,
+		retryWait:  defaultRetryWait,
+		client:     http.DefaultClient,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s, nil
+}
+
+func newFromJSONData(data []byte) (testsuite.Suite, error) {
+	cfg := &Config{}
+	if err := json.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
+	}
+	return New(cfg)
+}
 
 // WithHTTPClient can be used to specify the http.Client to use when making HTTP requests.
 func WithHTTPClient(c *http.Client) RunOption {
@@ -97,75 +87,62 @@ func WithRetryPolicy(n int, wait time.Duration) RunOption {
 	}
 }
 
-// Init initializes an HTTP test suite.
-func (s *Suite) Init(name string, n notifier.Notifier, opts ...RunOption) error {
-	s.name = name
-	s.notifier = n
-	s.retryCount = defaultRetryCount
-	s.retryWait = defaultRetryWait
-	s.client = http.DefaultClient
-
-	for _, opt := range opts {
-		opt(s)
+// Run runs all the tests in the suite.
+func (s *Suite) Run(r testsuite.Report) {
+	for _, t := range s.tests {
+		tr := r.AddTest(t.name)
+		s.runTestWithRetry(t, tr)
+		tr.Done()
 	}
-
-	if err := s.prepare(); err != nil {
-		return err
-	}
-	return nil
 }
 
 // runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
-func (s *Suite) runTestWithRetry(t *test, n int, wait time.Duration) error {
+func (s *Suite) runTestWithRetry(t *test, tr testsuite.TestReport) {
 	for attempt := 1; ; attempt++ {
-		err := s.runTest(t)
+		err := s.runTest(t, tr)
 		if err == nil {
-			return nil
+			return
 		}
-		if attempt > n {
-			return fmt.Errorf("could not run test after %d attempts: %v", n, err)
+		if attempt > s.retryCount {
+			tr.Errorf("could not run test after %d attempts: %v", attempt, err)
+			return
 		}
-		time.Sleep(wait * time.Duration(attempt))
+		time.Sleep(s.retryWait * time.Duration(attempt))
 	}
 }
 
-// Run runs all the tests in the suite.
-func (s *Suite) Run() {
-	log.Info("running test suite", zap.String("name", s.name))
-	start := time.Now()
-	for _, t := range s.Tests {
-		s.notifier.BeforeTest(t.Name)
-		if err := s.runTestWithRetry(&t, s.retryCount, s.retryWait); err != nil {
-			s.notifier.TestError(err)
-		}
-		s.notifier.AfterTest()
+func (s *Suite) runTest(t *test, tr testsuite.TestReport) error {
+	t.req.Body = ioutil.NopCloser(bytes.NewReader(t.body))
+	resp, err := s.client.Do(t.req)
+	if err != nil {
+		return fmt.Errorf("could not do HTTP request: %v", err)
 	}
-	s.notifier.SuiteDone()
-	log.Info("ran test suite", zap.String("name", s.name), zap.Duration("took", time.Since(start)))
+	// NOTE: not closing the body since NewResponse is taking care of that.
+
+	r, err := NewResponse(tr, resp)
+	if err != nil {
+		return err
+	}
+
+	r.StatusCode(t.statusCode)
+	r.ContainsHeader(t.header)
+	if t.rawDocument != nil {
+		if t.jsonDocument != nil {
+			r.MatchJSONDocument(t.jsonDocument)
+		} else {
+			r.MatchRawDocument(t.rawDocument)
+		}
+	} else if t.jsonSchema != nil {
+		r.MatchJSONSchema(t.jsonSchema)
+		if t.jsonValues != nil {
+			r.ContainsJSONValues(t.jsonValues)
+		}
+	}
+	return nil
 }
 
 func init() {
-	f := testsuite.RegisterFunc(func(cfg *testsuite.Config) (scheduler.Job, error) {
-		var suite Suite
-		if err := json.Unmarshal(cfg.Suite, &suite); err != nil {
-			return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
-		}
-
-		var n notifier.Notifier
-		if cfg.SlackWebhook != "" {
-			n = notifier.NewSlackNotifier(cfg.SlackWebhook, cfg.Name)
-		} else {
-			n = notifier.NewPrinter()
-		}
-
-		if err := suite.Init(cfg.Name, n); err != nil {
-			return nil, fmt.Errorf("could not init HTTP test suite: %v", err)
-		}
-
-		return &suite, nil
-	})
-
-	testsuite.Register("HTTP", f)
+	testsuite.Register("HTTP", newFromJSONData)
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -17,8 +16,6 @@ const (
 	redColor    = "#ff2a00"
 	orangeColor = "#f99157"
 )
-
-var _ = Notifier(&SlackNotifier{})
 
 type notification struct {
 	Channel     string       `json:"channel"`
@@ -47,132 +44,69 @@ type attachmentField struct {
 
 // SlackNotifier is a reporter that stacks errors for later use.
 // Stacked errors are printed on each report and removed from the stack.
-type SlackNotifier struct {
-	webhook   string
-	suiteName string
-
-	start      time.Time
-	currentRes testResult
-	results    []testResult
-}
-
-type testResult struct {
-	name     string
-	duration time.Duration
-	err      error
-	failures []error
-}
-
-func (t *testResult) isFailed() bool {
-	return len(t.failures) > 0
-}
-
-func (t *testResult) hasError() bool {
-	return t.err != nil
+type slackNotifier struct {
+	webhook  string
+	username string
+	channel  string
 }
 
 // NewSlackNotifier returns a new SlackNotifier given a Slack webhook and a test suite name.
-func NewSlackNotifier(webhook, name string) *SlackNotifier {
-	return &SlackNotifier{webhook: webhook, suiteName: name}
-}
-
-// BeforeTest implements the Notifier interface.
-func (r *SlackNotifier) BeforeTest(name string) {
-	r.start = time.Now()
-	r.currentRes = testResult{name: name}
-}
-
-// Report implements the Notifier interface.
-func (r *SlackNotifier) Report(err error) {
-	r.currentRes.failures = append(r.currentRes.failures, err)
-}
-
-// Errorf implements the Notifier interface.
-func (r *SlackNotifier) Errorf(format string, args ...interface{}) {
-	r.Report(fmt.Errorf(format, args...))
-}
-
-// TestError implements the Notifier interface.
-func (r *SlackNotifier) TestError(err error) {
-	r.currentRes.err = err
-}
-
-// AfterTest implements the Notifier interface.
-func (r *SlackNotifier) AfterTest() {
-	r.currentRes.duration = time.Since(r.start)
-	r.results = append(r.results, r.currentRes)
+func NewSlackNotifier(webhook, username, channel string) Notifier {
+	return &slackNotifier{
+		webhook:  webhook,
+		username: username,
+		channel:  channel,
+	}
 }
 
 // SuiteDone implements the Notifier interface.
-func (r *SlackNotifier) SuiteDone() {
-	failures := 0
+func (sn *slackNotifier) Notify(r *Report) {
 	errors := 0
-	for _, r := range r.results {
-		if r.isFailed() {
-			failures++
-		} else if r.hasError() {
-			errors++
-		}
+	for _, tr := range r.tests {
+		errors += len(tr.errs)
 	}
-
 	// Only send a Slack notification if something went wrong.
-	if failures == 0 && errors == 0 {
+	if errors == 0 {
 		return
 	}
 
 	test := "test"
-	if failures+errors > 1 {
+	if errors > 1 {
 		test = "tests"
 	}
 	notif := &notification{
-		// Username: "aragorn",
-		// Channel:  "aragorn-test",
-		Text: fmt.Sprintf("*%s* - %d %s failed", r.suiteName, failures+errors, test),
+		Username: sn.username,
+		Channel:  sn.channel,
+		Text:     fmt.Sprintf("*%s* - %d %s failed", r.name, errors, test),
 	}
 
-	var attachments []attachment
-	for _, r := range r.results {
-		var a attachment
-		if r.hasError() {
-			a = attachment{
-				MrkdwnIn: []string{"fields"},
-				Fallback: r.name + " could not run",
-				Color:    orangeColor,
-				Title:    fmt.Sprintf("Test %q could not run:", r.name),
-			}
-			a.Fields = append(a.Fields, attachmentField{
-				Value: fmt.Sprintf("```%s```", r.err),
-			})
-			attachments = append(attachments, a)
-		} else if r.isFailed() {
-			a = attachment{
-				MrkdwnIn: []string{"fields"},
-				Fallback: r.name + " failed",
-				Color:    redColor,
-				Title:    fmt.Sprintf("Test %q failed (%v):", r.name, r.duration),
-			}
-			for _, failure := range r.failures {
-				a.Fields = append(a.Fields, attachmentField{
-					Value: fmt.Sprintf("```%s```", failure),
-				})
-			}
-			attachments = append(attachments, a)
+	for _, tr := range r.tests {
+		if len(tr.errs) == 0 {
+			continue
 		}
+		a := attachment{
+			MrkdwnIn: []string{"fields"},
+			Fallback: tr.name + " failed",
+			Color:    redColor,
+			Title:    fmt.Sprintf("Test %q failed (%v):", tr.name, tr.duration),
+		}
+		for _, err := range tr.errs {
+			a.Fields = append(a.Fields, attachmentField{
+				Value: fmt.Sprintf("```%v```", err),
+			})
+		}
+		notif.Attachments = append(notif.Attachments, a)
 	}
-
-	notif.Attachments = append(notif.Attachments, attachments...)
-
-	sendSlackNotification(r.webhook, notif)
-	r.results = nil
+	sn.send(notif)
 }
 
-func sendSlackNotification(webhook string, notif *notification) {
+func (sn *slackNotifier) send(notif *notification) {
 	data, err := json.Marshal(notif)
 	if err != nil {
 		log.Error("could not marshal slack notification", zap.Error(err))
 		return
 	}
-	resp, err := http.Post(webhook, "application/json", bytes.NewBuffer(data))
+	resp, err := http.Post(sn.webhook, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		log.Error("could not send slack notification", zap.Error(err))
 		return
@@ -183,7 +117,6 @@ func sendSlackNotification(webhook string, notif *notification) {
 		return
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		log.Error("post slack notification failed", zap.ByteString("body", body))
 	}

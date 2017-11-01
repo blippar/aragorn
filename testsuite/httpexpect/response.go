@@ -10,14 +10,18 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/jmoiron/jsonq"
 	"github.com/santhosh-tekuri/jsonschema"
-
-	"github.com/blippar/aragorn/reporter"
 )
+
+// Logger logs error.
+type Logger interface {
+	Error(args ...interface{})
+	Errorf(format string, args ...interface{})
+}
 
 // Response wraps an http.Response and allows you to have expectations on it.
 type Response struct {
 	httpResp *http.Response
-	reporter reporter.Reporter
+	logger   Logger
 
 	// HTTP response body, this is required because some
 	// verifications need to read the body multiple times.
@@ -27,12 +31,11 @@ type Response struct {
 // NewResponse returns a new response on which you can have expectations.
 // Any failed expectation will be reported to the given reporter.
 // It reads and closes the response body.
-func NewResponse(reporter reporter.Reporter, resp *http.Response) (*Response, error) {
+func NewResponse(logger Logger, resp *http.Response) (*Response, error) {
 	r := &Response{
-		reporter: reporter,
+		logger:   logger,
 		httpResp: resp,
 	}
-
 	if err := r.readAndCloseBody(); err != nil {
 		return nil, err
 	}
@@ -56,17 +59,17 @@ func (r *Response) readAndCloseBody() error {
 // StatusCode checks whether the response has the given status code.
 func (r *Response) StatusCode(code int) {
 	if r.httpResp.StatusCode != code {
-		r.reporter.Errorf("wrong http status code (got %d; expected %d)", r.httpResp.StatusCode, code)
+		r.logger.Errorf("wrong http status code (got %d; expected %d)", r.httpResp.StatusCode, code)
 	}
 }
 
-// ContainsHeaders checks whether the response contains the given headers.
-func (r *Response) ContainsHeaders(h headers) {
+// ContainsHeader checks whether the response contains the given headers.
+func (r *Response) ContainsHeader(h Header) {
 	for k, v := range h {
 		if val := r.httpResp.Header.Get(k); val == "" {
-			r.reporter.Errorf("missing header %s", k)
+			r.logger.Errorf("missing header %s", k)
 		} else if val != v {
-			r.reporter.Errorf("wrong value for header %q (got %q; expected %q)", k, val, v)
+			r.logger.Errorf("wrong value for header %q (got %q; expected %q)", k, val, v)
 		}
 	}
 }
@@ -74,7 +77,7 @@ func (r *Response) ContainsHeaders(h headers) {
 // MatchRawDocument checks whether the raw response body matches the given document.
 func (r *Response) MatchRawDocument(doc []byte) {
 	if !cmp.Equal(r.body, doc) {
-		r.reporter.Errorf("request body does not match document")
+		r.logger.Error("request body does not match document")
 	}
 }
 
@@ -82,12 +85,12 @@ func (r *Response) MatchRawDocument(doc []byte) {
 func (r *Response) MatchJSONDocument(doc map[string]interface{}) {
 	resp := make(map[string]interface{})
 	if err := json.Unmarshal(r.body, &resp); err != nil {
-		r.reporter.Errorf("could not decode JSON response body: %v", err)
+		r.logger.Errorf("could not decode JSON response body: %v", err)
 		return
 	}
 
 	if !cmp.Equal(resp, doc) {
-		r.reporter.Errorf("request body does not match document")
+		r.logger.Error("request body does not match document")
 	}
 }
 
@@ -95,9 +98,9 @@ func (r *Response) MatchJSONDocument(doc map[string]interface{}) {
 func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
 	if err := schema.Validate(bytes.NewReader(r.body)); err != nil {
 		if e, ok := err.(*jsonschema.ValidationError); ok {
-			r.reporter.Errorf("wrong JSON schema: %v", e)
+			r.logger.Errorf("wrong JSON schema: %v", e)
 		} else {
-			r.reporter.Errorf("JSON schema validation failed: %v", err)
+			r.logger.Errorf("JSON schema validation failed: %v", err)
 		}
 	}
 }
@@ -107,7 +110,7 @@ func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
 func (r *Response) ContainsJSONValues(values map[string]interface{}) {
 	d := make(map[string]interface{})
 	if err := json.NewDecoder(bytes.NewReader(r.body)).Decode(&d); err != nil {
-		r.reporter.Errorf("could not decode JSON body: %v", err)
+		r.logger.Errorf("could not decode JSON body: %v", err)
 		return
 	}
 
@@ -116,12 +119,12 @@ func (r *Response) ContainsJSONValues(values map[string]interface{}) {
 	for key, expected := range values {
 		val, err := jq.Interface(strings.Split(key, ".")...)
 		if err != nil {
-			r.reporter.Errorf("missing JSON key: %q", key)
+			r.logger.Errorf("missing JSON key: %q", key)
 			continue
 		}
 
 		if !cmp.Equal(val, expected) {
-			r.reporter.Errorf("wrong value for key %q (got %v; want %v)", key, val, expected)
+			r.logger.Errorf("wrong value for key %q (got %v; want %v)", key, val, expected)
 		}
 	}
 }

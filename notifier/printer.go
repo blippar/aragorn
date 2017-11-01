@@ -1,66 +1,40 @@
 package notifier
 
 import (
-	"fmt"
-	"time"
-
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/blippar/aragorn/log"
 )
 
-var _ = Notifier(&Printer{})
-
 // Printer is a reporter that stacks errors for later use.
 // Stacked errors are printed on each report and removed from the stack.
-type Printer struct {
-	name     string
-	start    time.Time
-	failures []error
-	err      error
-}
+type printer struct{}
 
 // NewPrinter returns a new Printer.
-func NewPrinter() *Printer {
-	return &Printer{}
+func NewPrinter() Notifier {
+	return &printer{}
 }
 
-// BeforeTest implements the Notifier interface.
-func (r *Printer) BeforeTest(name string) {
-	r.name = name
-	r.start = time.Now()
-}
-
-// Report implements the Notifier interface.
-func (r *Printer) Report(err error) {
-	r.failures = append(r.failures, err)
-}
-
-// Errorf implements the notifier interface.
-func (r *Printer) Errorf(format string, args ...interface{}) {
-	r.Report(fmt.Errorf(format, args...))
-}
-
-// TestError implements the Notifier interface.
-func (r *Printer) TestError(err error) {
-	r.err = err
-}
-
-// AfterTest implements the Notifier interface.
-func (r *Printer) AfterTest() {
-	if len(r.failures) > 0 || r.err != nil {
-		if r.err != nil {
-			log.Info("could not run test", zap.String("name", r.name), zap.Duration("took", time.Since(r.start)), zap.Error(r.err))
-		} else {
-			log.Info("test failed", zap.String("name", r.name), zap.Duration("took", time.Since(r.start)), zap.Errors("failures", r.failures))
+func (*printer) Notify(r *Report) {
+	log.Info("test suite done",
+		zap.String("name", r.name),
+		zap.Time("started_at", r.start),
+		zap.Duration("duration", r.duration),
+		zap.Int("nb_tests", len(r.tests)),
+	)
+	for _, tr := range r.tests {
+		fields := []zapcore.Field{
+			zap.String("test_sute", r.name),
+			zap.String("name", tr.name),
+			zap.Time("started_at", tr.start),
+			zap.Duration("duration", tr.duration),
 		}
-	} else {
-		log.Info("test passed", zap.String("name", r.name), zap.Duration("took", time.Since(r.start)))
+		msg := "test passed"
+		if len(tr.errs) > 0 {
+			msg = "test failed"
+			fields = append(fields, zap.Errors("errs", tr.errs))
+		}
+		log.Info(msg, fields...)
 	}
-	r.failures = nil
-	r.err = nil
-}
-
-// SuiteDone implements the Notifier interface.
-func (r *Printer) SuiteDone() {
 }

@@ -1,20 +1,64 @@
 package notifier
 
-import "github.com/blippar/aragorn/reporter"
+import (
+	"errors"
+	"fmt"
+	"time"
 
-// Notifier is a set of methods called at specific steps duting a test suite run.
+	"github.com/blippar/aragorn/testsuite"
+)
+
+// Notifier notifies report.
 type Notifier interface {
-	reporter.Reporter
+	Notify(r *Report)
+}
 
-	// BeforeTest is called before each test run with the test name as a parameter.
-	BeforeTest(name string)
+type Report struct {
+	name     string
+	start    time.Time
+	duration time.Duration
+	tests    []*TestReport
+}
 
-	// TestError is called when a test could not be run.
-	TestError(err error)
+type TestReport struct {
+	name     string
+	start    time.Time
+	duration time.Duration
+	errs     []error
+}
 
-	// Report is called after each test run.
-	AfterTest()
+func NewReport(name string) *Report {
+	return &Report{
+		name:  name,
+		start: time.Now(),
+	}
+}
 
-	// Done is called when the complete test suite is done.
-	SuiteDone()
+func (r *Report) AddTest(name string) testsuite.TestReport {
+	tr := newTestReport(name)
+	r.tests = append(r.tests, tr)
+	return tr
+}
+
+func (r *Report) Done() {
+	r.duration = time.Since(r.start)
+}
+
+func newTestReport(name string) *TestReport {
+	return &TestReport{
+		name:  name,
+		start: time.Now(),
+	}
+}
+
+func (tr *TestReport) Error(args ...interface{}) {
+	tr.errs = append(tr.errs, errors.New(fmt.Sprint(args...)))
+}
+
+func (tr *TestReport) Errorf(format string, args ...interface{}) {
+	tr.errs = append(tr.errs, fmt.Errorf(format, args...))
+}
+
+func (tr *TestReport) Done() {
+	tr.duration = time.Since(tr.start)
 }

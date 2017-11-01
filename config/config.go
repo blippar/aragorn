@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+var errNoDirectory = errors.New("no directory to monitor")
+
 // Config is the configuration for the API.
 type Config struct {
 	Dirs     []string
@@ -27,13 +29,12 @@ func FromArgs() (*Config, error) {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		return nil, errors.New("no directory to monitor")
+		return nil, errNoDirectory
 	}
 
-	cfg := &Config{
+	return &Config{
 		Dirs:     args,
 		Humanize: *humanize,
 		RunOnce:  *runOnce,
-	}
-	return cfg, nil
+	}, nil
 }

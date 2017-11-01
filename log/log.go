@@ -7,22 +7,23 @@ import (
 
 var l *zap.Logger
 
-func Init(debug bool) error {
-	var err error
-	var zapCfg zap.Config
+func Init(debug bool) (err error) {
+	var (
+		cfg  zap.Config
+		opts []zap.Option
+	)
+
 	if debug {
-		zapCfg = zap.NewDevelopmentConfig()
+		cfg = zap.NewDevelopmentConfig()
+		opts = []zap.Option{zap.AddCallerSkip(1)}
 	} else {
-		zapCfg = zap.NewProductionConfig()
+		cfg = zap.NewProductionConfig()
 	}
 
-	zapCfg.DisableStacktrace = true
+	cfg.DisableStacktrace = true
 
-	l, err = zapCfg.Build()
-	if err != nil {
-		return err
-	}
-	return nil
+	l, err = cfg.Build(opts...)
+	return
 }
 
 func L() *zap.Logger {

@@ -29,7 +29,9 @@ A test suite describes a combination of tests to be run. It is composed of some 
 |type|`string`|✔️|`HTTP` or `GRPC` (currently only `HTTP` is implemented)|
 |runEvery|`string`||A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`.|
 |runCron|`string`||A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`|
-|slackWebhook|`string`|✔️|A Slack webhook used to post notifications in case this test suite fails.|
+|slack.webhook|`string`|✔️|A Slack webhook used to post notifications in case this test suite fails.|
+|slack.username|`string`|✔️|A Slack username used to post notifications in case this test suite fails.|
+|slack.channel|`string`|✔️|A Slack channel used to post notifications in case this test suite fails.|
 |suite|`HTTPsuite` or `GRPCSuite`|✔️|An object describing the test suite itself. Depends on the field `type`.|
 
 Example :
@@ -39,7 +41,11 @@ Example :
     "name": "Service 1 HTTP test suite",
     "type": "HTTP",
     "runEvery": "12h",
-    "slackWebhook": "https://hooks.slack.com/services/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",
+    "slack": {
+      "webhook": "https://hooks.slack.com/services/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",
+      "username": "test-bot",
+      "channel": "testing"
+    },
     "suite": {"..."}
 }
 ```
@@ -50,7 +56,7 @@ An HTTP test suite contains a base configuration and list of tests.
 
 |Name|Type|Required|Description|
 |-|-|:-:|-|
-|base|`HTTPBase`|✔️|Base description of the tests in this suite like base URL or HTTP headers to add too all requests|
+|base|`HTTPBase`|✔️|Base description of the tests in this suite like base URL or HTTP header to add too all requests|
 |tests|`[]HTTPTest`|✔️|List of tests to run.|
 
 `HTTPBase`
@@ -58,7 +64,7 @@ An HTTP test suite contains a base configuration and list of tests.
 |Name|Type|Required|Description|
 |-|-|:-:|-|
 |url|`string`|✔️|Base URL prepended to all `path` in each test request.|
-|headers|`map[string]string`||List of headers to add to every test in this suite. Each test can overwrite a header set at this level.|
+|header|`map[string]string`||List of header to add to every test in this suite. Each test can overwrite a header set at this level.|
 
 `HTTPTest`
 
@@ -74,10 +80,10 @@ An HTTP test suite contains a base configuration and list of tests.
 |-|-|:-:|-|
 |path|`string`||Path appended to the base `url` set in the `HTTPBase`. Defaults to `/`.|
 |method|`string`||HTTP method of the request. Defaults to `GET`.|
-|headers|`map[string]string`||HTTP headers of the request.|
+|header|`map[string]string`||Key-value pairs in the HTTP header of the request.|
 |multipart|`map[string]string`||Multipart content of the request. Values started with a `@` are files.|
-|formURLEncoded|`map[string][]string`||Form data as application/x-url-encoded format.|
-|body|`string`||Request body. Can be a file, if starting with the character `@`.|
+|formData|`map[string]string`||Form data as application/x-url-encoded format.|
+|body|`any`||Request body. Can be a file, if it's a string that start with the character `@`.|
 
 
 `HTTPExpect`
@@ -85,7 +91,7 @@ An HTTP test suite contains a base configuration and list of tests.
 |Name|Type|Required|Description|
 |-|-|:-:|-|
 |statusCode|`int`|✔️|Expected HTTP status code.|
-|headers|`map[string]string`||Expected HTTP headers.|
+|header|`map[string]string`||Expected key-value pairs in the HTTP header.|
 |jsonDocument|`string`||Expected JSON document to be returned. Format is not taken into account, only values are compared. Can be an inline string value (escaped JSON), or a separate JSON file, if starting with the character `@`.|
 |jsonSchema|`string`||Expected JSON schema (1) to be returned.  Can be a file, if starting with the character `@`.|
 |jsonValues|`string`||Specific JSON values (2) to be returned.  Can be a file, if starting with the character `@`.|
@@ -101,19 +107,23 @@ Work in progress...
 # Example
 
 This example shows how to create an HTTP test suite file that will run 2 tests every 12h :
-- The first one is a `GET http://127.0.0.1:8080/` and expects a 200 JSON response `{"key": "value"}`.
-- The second test is a `POST http://127.0.0.1:8080/echo` with a JSON body containing `{"key":"value"}`. It expects a JSON response with a Content-Length of 14 and matching the JSON schema `suites/schemas/schema.json`.
+- The first one is a `GET http://localhost:8080/` and expects a 200 JSON response `{"key": "value"}`.
+- The second test is a `POST http://localhost:8080/echo` with a JSON body containing `{"key":"value"}`. It expects a JSON response with a Content-Length of 14 and matching the JSON schema `suites/schemas/schema.json`.
 
 ```json
 {
     "name": "Service 1 HTTP test suite",
     "type": "HTTP",
     "runEvery": "12h",
-    "slackWebhook": "https://hooks.slack.com/services/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",
+    "slack": {
+      "webhook": "https://hooks.slack.com/services/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",
+      "username": "test-bot",
+      "channel": "testing"
+    },
     "suite": {
         "base": {
-            "url": "http://127.0.0.1:8080",
-            "headers": {
+            "url": "http://localhost:8080",
+            "header": {
                 "Accept-Encoding": "application/json"
             }
         },
@@ -126,7 +136,7 @@ This example shows how to create an HTTP test suite file that will run 2 tests e
                 },
                 "expect": {
                     "statusCode": 200,
-                    "headers": {
+                    "header": {
                         "Content-Type": "application/json",
                         "Content-Length": "15"
                     },
@@ -138,14 +148,14 @@ This example shows how to create an HTTP test suite file that will run 2 tests e
                 "request": {
                     "path": "/echo",
                     "method": "POST",
-                    "headers": {
+                    "header": {
                         "Content-Type": "application/json"
                     },
                     "body": {"key":"value"}
                 },
                 "expect": {
                     "statusCode": 200,
-                    "headers": {
+                    "header": {
                         "Content-Type": "application/json",
                         "Content-Length": "15"
                     },

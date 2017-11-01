@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,13 @@ import (
 	"github.com/blippar/aragorn/scheduler"
 )
 
+const testSuiteJSONSuffix = ".suite.json"
+
+var (
+	errFSEventsChClosed = errors.New("fsnotify events channel closed")
+	errFSErrorsChClosed = errors.New("fsnotify errors channel closed")
+)
+
 type Server struct {
 	cfg *config.Config
 	fsw *fsnotify.Watcher
@@ -21,17 +29,13 @@ type Server struct {
 
 	doneCh chan struct{}
 	stopCh chan struct{}
-	errCh  chan error
 }
 
 func New(cfg *config.Config) *Server {
-	s := &Server{
-		cfg:   cfg,
-		sch:   scheduler.New(),
-		errCh: make(chan error, 1),
+	return &Server{
+		cfg: cfg,
+		sch: scheduler.New(),
 	}
-
-	return s
 }
 
 func (s *Server) Start() error {
@@ -47,9 +51,7 @@ func (s *Server) Start() error {
 		return nil
 	}
 
-	var err error
-	s.fsw, err = newFSWatcher(s.cfg)
-	if err != nil {
+	if err := s.initFSWatcher(); err != nil {
 		return err
 	}
 
@@ -71,28 +73,56 @@ func (s *Server) Wait() <-chan struct{} {
 	return s.doneCh
 }
 
-func newFSWatcher(cfg *config.Config) (*fsnotify.Watcher, error) {
-	fsw, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, fmt.Errorf("could not create new fsnotify watcher: %v", err)
-	}
-
-	for _, dir := range cfg.Dirs {
-		log.Info("adding directory to fsnotify watcher", zap.String("directory", dir))
-		if err = fsw.Add(dir); err != nil {
-			return nil, fmt.Errorf("could not add directory %q to fsnotify watcher: %v", dir, err)
+func (s *Server) loadDirs() error {
+	log.Info("looking for existing test suite files", zap.Strings("directories", s.cfg.Dirs))
+	for _, dir := range s.cfg.Dirs {
+		if err := filepath.Walk(dir, s.walkFn); err != nil {
+			return fmt.Errorf("could not walk %q directory: %v", dir, err)
 		}
 	}
-	return fsw, nil
+	return nil
+}
+
+func (s *Server) walkFn(path string, info os.FileInfo, err error) error {
+	// NOTE: All errors that arise visiting files and directories are filtered by walkFn.
+	if err != nil {
+		return err
+	}
+	if strings.HasSuffix(path, testSuiteJSONSuffix) {
+		if err := s.newTestSuiteFromDisk(path, !s.cfg.RunOnce); err != nil {
+			log.Error("could not add test suite", zap.String("file", path), zap.Error(err))
+			return nil
+		}
+		log.Info("test suite added", zap.String("file", path))
+	}
+	return nil
+}
+
+func (s *Server) initFSWatcher() error {
+	fsw, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("could not create new fsnotify watcher: %v", err)
+	}
+
+	log.Info("adding directories to fsnotify watcher", zap.Strings("directories", s.cfg.Dirs))
+	for _, dir := range s.cfg.Dirs {
+		if err := fsw.Add(dir); err != nil {
+			fsw.Close()
+			return fmt.Errorf("could not add %q directory to fsnotify watcher: %v", dir, err)
+		}
+	}
+	s.fsw = fsw
+	return nil
 }
 
 func (s *Server) run() {
-	go s.fsWatchEventLoop()
-	go s.fsWatchErrorLoop()
-	log.Info("started server")
+	errCh := make(chan error, 2)
+	go func() { errCh <- s.fsWatchEventLoop() }()
+	go func() { errCh <- s.fsWatchErrorLoop() }()
+	log.Info("server started")
 
 	select {
-	case err := <-s.errCh:
+	case err := <-errCh:
 		log.Error("server stopping after fatal error", zap.Error(err))
 	case <-s.stopCh:
 		log.Info("server received stop signal")
@@ -106,50 +136,39 @@ func (s *Server) run() {
 	log.Info("server stopped")
 }
 
-func (s *Server) walkFn(p string, info os.FileInfo, e error) error {
-	if strings.HasSuffix(p, ".suite.json") {
-		log.Info("loading test suite", zap.String("file", p))
-		if err := s.newTestSuiteFromDisk(p, !s.cfg.RunOnce); err != nil {
-			log.Error("could not load test suite", zap.String("file", p), zap.Error(err))
-		}
-	}
-	return e
-}
-
-func (s *Server) loadDirs() error {
-	log.Info("looking for existing test suite files", zap.Strings("directories", s.cfg.Dirs))
-
-	for _, dir := range s.cfg.Dirs {
-		err := filepath.Walk(dir, s.walkFn)
-		if err != nil {
-			return fmt.Errorf("could not walk dir %q: %v", dir, err)
-		}
-	}
-	return nil
-}
-
-func (s *Server) fsWatchEventLoop() {
+func (s *Server) fsWatchEventLoop() error {
 	for e := range s.fsw.Events {
-		if strings.HasSuffix(e.Name, ".suite.json") {
-			switch {
-			case isCreateEvent(e.Op):
-				log.Info("new test suite", zap.String("file", e.Name))
-				if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
-					log.Error("could not create test suite from disk", zap.Error(err))
-					break
-				}
-			case isRenameEvent(e.Op) || isRemoveEvent(e.Op):
-				log.Info("removing test suite", zap.String("file", e.Name))
-				s.removeTestSuite(e.Name)
-			case isWriteEvent(e.Op):
-				log.Info("test suite changed", zap.String("file", e.Name))
-				s.removeTestSuite(e.Name)
-				if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
-					log.Error("could not create test suite from disk", zap.Error(err))
-					break
-				}
-			}
+		if strings.HasSuffix(e.Name, testSuiteJSONSuffix) {
+			s.fsHandleTestSuiteFileEvent(e)
 		}
+	}
+	return errFSEventsChClosed
+}
+
+func (s *Server) fsHandleTestSuiteFileEvent(e fsnotify.Event) {
+	switch {
+	case isCreateEvent(e.Op):
+		if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
+			log.Error("could not add test suite", zap.String("file", e.Name), zap.Error(err))
+			return
+		}
+		log.Info("test suite added", zap.String("file", e.Name))
+	case isRenameEvent(e.Op) || isRemoveEvent(e.Op):
+		if err := s.removeTestSuite(e.Name); err != nil {
+			log.Error("could not remove test suite", zap.String("file", e.Name), zap.Error(err))
+			return
+		}
+		log.Info("test suite removed", zap.String("file", e.Name))
+	case isWriteEvent(e.Op):
+		if err := s.removeTestSuite(e.Name); err != nil {
+			log.Error("could not remove test suite", zap.String("file", e.Name), zap.Error(err))
+			return
+		}
+		if err := s.newTestSuiteFromDisk(e.Name, true); err != nil {
+			log.Error("could not create test suite from disk", zap.String("file", e.Name), zap.Error(err))
+			return
+		}
+		log.Info("test suite updated", zap.String("file", e.Name))
 	}
 }
 
@@ -169,11 +188,12 @@ func isRemoveEvent(o fsnotify.Op) bool {
 	return o&fsnotify.Remove == fsnotify.Remove
 }
 
-func (s *Server) fsWatchErrorLoop() {
+func (s *Server) fsWatchErrorLoop() error {
 	for err := range s.fsw.Errors {
 		// NOTE: those errors might be fatal, so maybe its would
 		// be better to return the first error encountered instead
 		// of just logging it.
 		log.Error("inotify watcher error", zap.Error(err))
 	}
+	return errFSErrorsChClosed
 }

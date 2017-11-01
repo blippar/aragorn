@@ -15,75 +15,80 @@ import (
 	"github.com/santhosh-tekuri/jsonschema"
 )
 
-const (
-	defaultRequestPath        = "/"
-	defaultRequestMethod      = http.MethodGet
-	defaultExpectedStatusCode = http.StatusOK
-)
+// A Header represents the key-value pairs in an HTTP header.
+type Header map[string]string
+
+type Config struct {
+	Base  Base
+	Tests []*Test
+}
+
+type Base struct {
+	URL    string // Base URL prepended to all requests' path.
+	Header Header // Base set of headers added to all requests.
+}
+
+type Test struct {
+	Name    string  // Name used to identify this test.
+	Request Request // Request describes the HTTP request.
+	Expect  Expect  // Expect describes the result of the HTTP request.
+}
+
+type Request struct {
+	URL    string // If set, will overwrite the base URL.
+	Path   string
+	Method string
+	Header Header
+
+	// Only one of the three following must be set.
+	Body      json.RawMessage
+	Multipart map[string]string
+	FormData  map[string]string
+}
+
+type Expect struct {
+	StatusCode int
+	Header     Header
+
+	Document   json.RawMessage // Exact document to match. Exclusive with JSONSchema.
+	JSONSchema json.RawMessage // Exact JSON schema to match. Exclusive with Document.
+	JSONValues json.RawMessage // Required JSON values. Optional, if JSONSchema is set.
+}
 
 // prepare verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
-func (s *Suite) prepare() error {
+func (cfg *Config) genTests() ([]*test, error) {
+	if cfg.Base.URL == "" {
+		return nil, errors.New("base: URL is required")
+	}
+	if _, err := url.Parse(cfg.Base.URL); err != nil {
+		return nil, fmt.Errorf("base: URL is invalid: %v", err)
+	}
+	if len(cfg.Tests) == 0 {
+		return nil, errors.New("a test suite must contain at least one test")
+	}
+	ts := make([]*test, len(cfg.Tests))
 	var errs []string
-	if s.Base == nil {
-		return errors.New("base is required")
-	}
-	if err := prepareBase(s.Base); err != nil {
-		errs = append(errs, err.Error())
-	}
-
-	if len(s.Tests) == 0 {
-		errs = append(errs, "a test suite must contain at least one test")
-		return concatErrors(errs)
-	}
-	if err := prepareTests(s.Base, s.Tests); err != nil {
-		errs = append(errs, err.Error())
-	}
-
-	return concatErrors(errs)
-}
-
-func prepareBase(b *base) error {
-	if b.URL == "" {
-		return errors.New("base: URL is required")
-	} else if _, err := url.Parse(b.URL); err != nil {
-		return fmt.Errorf("base: URL is invalid: %v", err)
-	}
-
-	return nil
-}
-
-func prepareTests(b *base, ts []test) error {
-	var errs []string
-	for _, t := range ts {
-		if err := prepareTest(b, &t); err != nil {
-			errs = append(errs, fmt.Sprintf("test %q:\n%v", t.Name, err))
+	for i, test := range cfg.Tests {
+		t, err := cfg.prepareTest(test)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("test %q:\n%v", test.Name, err))
 		}
+		ts[i] = t
 	}
-
-	return concatErrors(errs)
+	if err := concatErrors(errs); err != nil {
+		return nil, err
+	}
+	return ts, nil
 }
 
-func prepareTest(b *base, t *test) error {
+func (cfg *Config) prepareTest(t *Test) (*test, error) {
+	test := &test{
+		name:       t.Name,
+		statusCode: t.Expect.StatusCode,
+		header:     t.Expect.Header,
+	}
 	var errs []string
-
-	// Request
-	if t.Request == nil {
-		return errors.New("- request: field required")
-	}
-
-	if t.Request.URL != "" {
-		if _, err := url.Parse(t.Request.URL); err != nil {
-			errs = append(errs, fmt.Sprintf("- request: URL is invalid: %v", err))
-		}
-	}
-
-	if t.Request.Path == "" {
-		t.Request.Path = defaultRequestPath
-	}
-	if t.Request.Method == "" {
-		t.Request.Method = defaultRequestMethod
-	}
 
 	set := 0
 	if t.Request.Body != nil {
@@ -92,27 +97,19 @@ func prepareTest(b *base, t *test) error {
 	if t.Request.Multipart != nil {
 		set++
 	}
-	if t.Request.FormURLEncoded != nil {
+	if t.Request.FormData != nil {
 		set++
 	}
 	if set > 1 {
 		errs = append(errs, "- request: at most one of body, multipart or formURLEncoded can be set at once")
 	}
 
-	var err error
-	t.Request.httpReq, err = newHTTPRequest(b, t.Request)
-	if err != nil {
+	if err := cfg.setHTTPRequest(test, &t.Request); err != nil {
 		errs = append(errs, fmt.Sprintf("- request: could not create HTTP request: %v", err))
 	}
 
-	// Expect
-	if t.Expect == nil {
-		errs = append(errs, "- request: field is required")
-		return concatErrors(errs)
-	}
-
-	if t.Expect.StatusCode == 0 {
-		t.Expect.StatusCode = defaultExpectedStatusCode
+	if test.statusCode == 0 {
+		test.statusCode = http.StatusOK
 	}
 
 	if t.Expect.Document != nil && t.Expect.JSONSchema != nil {
@@ -128,15 +125,15 @@ func prepareTest(b *base, t *test) error {
 		if bytes.HasPrefix(d, []byte(`"`)) && bytes.HasSuffix(d, []byte(`"`)) {
 			c := d[1 : len(d)-1]
 			if bytes.HasPrefix(c, []byte("@")) {
-				t.Expect.rawDocument, err = ioutil.ReadFile(string(c[1:]))
+				test.rawDocument, err = ioutil.ReadFile(string(c[1:]))
 				if err != nil {
 					errs = append(errs, fmt.Sprintf("- expect: could not read document: %v", err))
 				}
 			} else {
-				t.Expect.rawDocument = c
+				test.rawDocument = c
 			}
 		} else {
-			if err = json.Unmarshal(d, &t.Expect.jsonDocument); err != nil {
+			if err = json.Unmarshal(d, &test.jsonDocument); err != nil {
 				errs = append(errs, fmt.Sprintf("- expect: could not decode expected document: %v", err))
 			}
 		}
@@ -151,7 +148,7 @@ func prepareTest(b *base, t *test) error {
 			cc := jsonschema.NewCompiler()
 			// NOTE: the parameter "schema.json" is not relevent.
 			cc.AddResource("schema.json", r)
-			t.Expect.jsonSchema, err = cc.Compile("schema.json")
+			test.jsonSchema, err = cc.Compile("schema.json")
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("- expect: could not compile JSON schema: %v", err))
 			}
@@ -164,13 +161,16 @@ func prepareTest(b *base, t *test) error {
 			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON values: %v", err))
 		} else {
 			defer r.Close()
-			if err = json.NewDecoder(r).Decode(&t.Expect.jsonValues); err != nil {
+			if err = json.NewDecoder(r).Decode(&test.jsonValues); err != nil {
 				errs = append(errs, fmt.Sprintf("- expect: could decode expected JSON values: %v", err))
 			}
 		}
 	}
 
-	return concatErrors(errs)
+	if err := concatErrors(errs); err != nil {
+		return nil, err
+	}
+	return test, nil
 }
 
 // getReadCloser returns an io.ReadCloser from a byte slice, or from a file if

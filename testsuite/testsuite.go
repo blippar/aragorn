@@ -1,45 +1,38 @@
 package testsuite
 
 import (
-	"encoding/json"
 	"fmt"
-
-	"github.com/blippar/aragorn/scheduler"
 )
 
-type Config struct {
-	// Name used to identify this test suite.
-	Name string
-
-	RunEvery string // parsable by time.ParseDuration
-	RunCron  string // cron string
-
-	SlackWebhook string
-
-	// Type of the test suite, can be HTTP or GRPC.
-	Type string
-
-	// Description of the test suite, depends on Type.
-	Suite json.RawMessage
+type Suite interface {
+	Run(Report)
 }
 
-type RegisterFunc func(*Config) (scheduler.Job, error)
-
-var m map[string]RegisterFunc
-
-func init() {
-	m = make(map[string]RegisterFunc)
+type Report interface {
+	AddTest(name string) TestReport
 }
 
-func CreateJob(cfg *Config) (scheduler.Job, error) {
-	fn, ok := m[cfg.Type]
+type TestReport interface {
+	Error(args ...interface{})
+	Errorf(format string, args ...interface{})
+	Done()
+}
+
+type RegisterFunc func(data []byte) (Suite, error)
+
+var m = make(map[string]RegisterFunc)
+
+func Get(typ string) (RegisterFunc, error) {
+	fn, ok := m[typ]
 	if !ok {
-		return nil, fmt.Errorf("unsupported test suite type: %q", cfg.Type)
+		return nil, fmt.Errorf("unsupported test suite type: %q", typ)
 	}
-
-	return fn(cfg)
+	return fn, nil
 }
 
 func Register(typ string, fn RegisterFunc) {
+	if _, ok := m[typ]; ok {
+		panic(fmt.Sprintf("type %q already registered", typ))
+	}
 	m[typ] = fn
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/gorhill/cronexpr"
 )
 
+// Job is a job representation for the scheduler.
 type Job interface {
 	Run()
 }
