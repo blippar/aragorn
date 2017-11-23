@@ -18,7 +18,7 @@ type TestReport interface {
 	Done()
 }
 
-type RegisterFunc func(data []byte) (Suite, error)
+type RegisterFunc func(path string, data []byte) (Suite, error)
 
 var m = make(map[string]RegisterFunc)
 

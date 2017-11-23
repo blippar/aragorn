@@ -22,7 +22,8 @@ const (
 type Suite struct {
 	tests []*test
 
-	client     *http.Client
+	client *http.Client
+
 	retryCount int
 	retryWait  time.Duration
 }
@@ -35,9 +36,7 @@ type test struct {
 	statusCode int
 	header     Header
 
-	rawDocument  []byte                 // Raw document
-	jsonDocument map[string]interface{} // Decoded json document.
-
+	document   interface{}
 	jsonSchema *jsonschema.Schema     // Compiled jsonschema.
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
@@ -54,9 +53,10 @@ func New(cfg *Config, opts ...RunOption) (*Suite, error) {
 	s := &Suite{
 		tests: tests,
 
+		client: http.DefaultClient,
+
 		retryCount: defaultRetryCount,
 		retryWait:  defaultRetryWait,
-		client:     http.DefaultClient,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -64,11 +64,13 @@ func New(cfg *Config, opts ...RunOption) (*Suite, error) {
 	return s, nil
 }
 
-func newFromJSONData(data []byte) (testsuite.Suite, error) {
+// NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
+func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
 	cfg := &Config{}
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
 	}
+	cfg.Path = path
 	return New(cfg)
 }
 
@@ -114,35 +116,54 @@ func (s *Suite) runTestWithRetry(t *test, tr testsuite.TestReport) {
 }
 
 func (s *Suite) runTest(t *test, tr testsuite.TestReport) error {
-	t.req.Body = ioutil.NopCloser(bytes.NewReader(t.body))
-	resp, err := s.client.Do(t.req)
+	req := t.cloneRequest()
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not do HTTP request: %v", err)
 	}
-	// NOTE: not closing the body since NewResponse is taking care of that.
-
-	r, err := NewResponse(tr, resp)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not read body: %v", err)
 	}
-
+	r := NewResponse(tr, resp, body)
 	r.StatusCode(t.statusCode)
 	r.ContainsHeader(t.header)
-	if t.rawDocument != nil {
-		if t.jsonDocument != nil {
-			r.MatchJSONDocument(t.jsonDocument)
+	if t.document != nil {
+		raw, ok := t.document.([]byte)
+		if ok {
+			r.MatchRawDocument(raw)
 		} else {
-			r.MatchRawDocument(t.rawDocument)
+			r.MatchJSONDocument(t.document)
 		}
-	} else if t.jsonSchema != nil {
+	}
+	if t.jsonSchema != nil {
 		r.MatchJSONSchema(t.jsonSchema)
-		if t.jsonValues != nil {
-			r.ContainsJSONValues(t.jsonValues)
-		}
+	}
+	if t.jsonValues != nil {
+		r.ContainsJSONValues(t.jsonValues)
 	}
 	return nil
 }
 
+// cloneRequest returns a clone of the provided *http.Request.
+// The clone is a shallow copy of the struct and its Header map.
+func (t *test) cloneRequest() *http.Request {
+	// shallow copy of the struct
+	r := t.req
+	r2 := new(http.Request)
+	*r2 = *r
+	// deep copy of the Header
+	r2.Header = make(http.Header, len(r.Header))
+	for k, s := range r.Header {
+		r2.Header[k] = append([]string(nil), s...)
+	}
+	if len(t.body) > 0 {
+		r2.Body = ioutil.NopCloser(bytes.NewReader(t.body))
+	}
+	return r2
+}
+
 func init() {
-	testsuite.Register("HTTP", newFromJSONData)
+	testsuite.Register("HTTP", NewSuiteFromJSON)
 }

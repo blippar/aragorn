@@ -2,12 +2,14 @@ package httpexpect
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,12 +19,12 @@ func (cfg *Config) setHTTPRequest(t *test, req *Request) error {
 	var cntType string
 	var err error
 	if req.Body != nil {
-		t.body, err = fromBody(req.Body)
+		t.body, err = cfg.fromBody(req.Body)
 		if err != nil {
 			return err
 		}
 	} else if req.Multipart != nil {
-		t.body, cntType, err = fromMultipart(req.Multipart)
+		t.body, cntType, err = cfg.fromMultipart(req.Multipart)
 		if err != nil {
 			return err
 		}
@@ -63,45 +65,54 @@ func (cfg *Config) setHTTPRequest(t *test, req *Request) error {
 	return nil
 }
 
-func fromBody(body []byte) ([]byte, error) {
-	if bytes.HasPrefix(body, []byte(`"@`)) && bytes.HasSuffix(body, []byte(`"`)) {
-		return ioutil.ReadFile(string(body[2 : len(body)-1]))
+func (cfg *Config) fromBody(body interface{}) ([]byte, error) {
+	s, ok := body.(string)
+	if !ok {
+		return json.Marshal(body)
 	}
-	return body, nil
+	if !strings.HasPrefix(s, "@") {
+		return []byte(s), nil
+	}
+	path := cfg.getFilePath(s[1:])
+	return ioutil.ReadFile(path)
 }
 
-func fromMultipart(multi map[string]string) ([]byte, string, error) {
+func (cfg *Config) fromMultipart(m map[string]string) ([]byte, string, error) {
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
-
-	for k, v := range multi {
-		if strings.HasPrefix(v, "@") { // This is a file.
-			filename := v[1:]
-			f, err := os.Open(filename)
-			if err != nil {
-				return nil, "", err
-			}
-			defer f.Close()
-			fw, err := w.CreateFormFile(k, filename)
-			if err != nil {
-				return nil, "", err
-			}
-			if _, err = io.Copy(fw, f); err != nil {
-				return nil, "", err
-			}
-		} else { // This is a key-value pair.
-			fw, err := w.CreateFormField(k)
-			if err != nil {
-				return nil, "", err
-			}
-			if _, err := fw.Write([]byte(v)); err != nil {
-				return nil, "", err
-			}
+	for k, v := range m {
+		if err := cfg.addMultipartKV(w, k, v); err != nil {
+			return nil, "", err
 		}
 	}
-
 	w.Close()
 	return b.Bytes(), w.FormDataContentType(), nil
+}
+
+func (cfg *Config) addMultipartKV(w *multipart.Writer, k, v string) error {
+	if strings.HasPrefix(v, "@") {
+		path := cfg.getFilePath(v[1:])
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		filename := filepath.Base(path)
+		fw, err := w.CreateFormFile(k, filename)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(fw, f); err != nil {
+			return err
+		}
+		return nil
+	}
+	fw, err := w.CreateFormField(k)
+	if err != nil {
+		return err
+	}
+	_, err = fw.Write([]byte(v))
+	return err
 }
 
 func fromFormData(m map[string]string) []byte {

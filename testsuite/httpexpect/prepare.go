@@ -9,16 +9,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema"
 )
 
-// A Header represents the key-value pairs in an HTTP header.
-type Header map[string]string
-
 type Config struct {
+	Path  string
 	Base  Base
 	Tests []*Test
 }
@@ -41,7 +39,7 @@ type Request struct {
 	Header Header
 
 	// Only one of the three following must be set.
-	Body      json.RawMessage
+	Body      interface{}
 	Multipart map[string]string
 	FormData  map[string]string
 }
@@ -50,10 +48,13 @@ type Expect struct {
 	StatusCode int
 	Header     Header
 
-	Document   json.RawMessage // Exact document to match. Exclusive with JSONSchema.
+	Document   interface{}     // Exact document to match. Exclusive with JSONSchema.
 	JSONSchema json.RawMessage // Exact JSON schema to match. Exclusive with Document.
-	JSONValues json.RawMessage // Required JSON values. Optional, if JSONSchema is set.
+	JSONValues interface{}     // Required JSON values. Optional, if JSONSchema is set.
 }
+
+// A Header represents the key-value pairs in an HTTP header.
+type Header map[string]string
 
 // prepare verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
@@ -120,31 +121,18 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 	}
 
 	if t.Expect.Document != nil {
-		var err error
-		d := t.Expect.Document
-		if bytes.HasPrefix(d, []byte(`"`)) && bytes.HasSuffix(d, []byte(`"`)) {
-			c := d[1 : len(d)-1]
-			if bytes.HasPrefix(c, []byte("@")) {
-				test.rawDocument, err = ioutil.ReadFile(string(c[1:]))
-				if err != nil {
-					errs = append(errs, fmt.Sprintf("- expect: could not read document: %v", err))
-				}
-			} else {
-				test.rawDocument = c
-			}
-		} else {
-			if err = json.Unmarshal(d, &test.jsonDocument); err != nil {
-				errs = append(errs, fmt.Sprintf("- expect: could not decode expected document: %v", err))
-			}
+		doc, err := cfg.getDocumentField(t.Expect.Document)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("- expect: could get Document: %v", err))
 		}
+		test.document = doc
 	}
 
 	if t.Expect.JSONSchema != nil {
-		r, err := getReadCloser(t.Expect.JSONSchema)
+		r, err := cfg.getReaderFromJSONRawMessage(t.Expect.JSONSchema)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON schema: %v", err))
 		} else {
-			defer r.Close()
 			cc := jsonschema.NewCompiler()
 			// NOTE: the parameter "schema.json" is not relevent.
 			cc.AddResource("schema.json", r)
@@ -156,14 +144,13 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 	}
 
 	if t.Expect.JSONValues != nil {
-		r, err := getReadCloser(t.Expect.JSONValues)
+		v, err := cfg.getDocumentField(t.Expect.JSONValues)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON values: %v", err))
+		} else if m, ok := v.(map[string]interface{}); !ok {
+			errs = append(errs, fmt.Sprintf("- expect: invalid JSON Values type: must be an object"))
 		} else {
-			defer r.Close()
-			if err = json.NewDecoder(r).Decode(&test.jsonValues); err != nil {
-				errs = append(errs, fmt.Sprintf("- expect: could decode expected JSON values: %v", err))
-			}
+			test.jsonValues = m
 		}
 	}
 
@@ -173,20 +160,46 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 	return test, nil
 }
 
-// getReadCloser returns an io.ReadCloser from a byte slice, or from a file if
+func (cfg *Config) getDocumentField(v interface{}) (interface{}, error) {
+	s, ok := v.(string)
+	if !ok {
+		return v, nil
+	}
+	if !strings.HasPrefix(s, "@") {
+		return []byte(s), nil
+	}
+	path := cfg.getFilePath(s[1:])
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var newVal interface{}
+	if err := json.Unmarshal(data, &newVal); err != nil {
+		return nil, err
+	}
+	return newVal, nil
+}
+
+// getReaderFromJSONRawMessage returns an io.Reader from a byte slice, or from a file if
 // the byte slice starts with the characters '"@'.
-func getReadCloser(s []byte) (io.ReadCloser, error) {
-	var r io.ReadCloser
-	if bytes.HasPrefix(s, []byte(`"@`)) && bytes.HasSuffix(s, []byte(`"`)) { // From file.
-		f, err := os.Open(string(s[2 : len(s)-1]))
+func (cfg *Config) getReaderFromJSONRawMessage(val []byte) (io.Reader, error) {
+	s := string(val)
+	if strings.HasPrefix(s, `"@`) && strings.HasSuffix(s, `"`) {
+		path := cfg.getFilePath(s[2 : len(s)-1])
+		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return nil, err
 		}
-		r = f
-	} else { // Inline.
-		r = ioutil.NopCloser(bytes.NewReader(s))
+		val = data
 	}
-	return r, nil
+	return bytes.NewReader(val), nil
+}
+
+func (cfg *Config) getFilePath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(cfg.Path, path)
 }
 
 func concatErrors(errs []string) error {

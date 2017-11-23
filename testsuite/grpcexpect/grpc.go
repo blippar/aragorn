@@ -13,7 +13,8 @@ func New() (testsuite.Suite, error) {
 	return &Suite{}, nil
 }
 
-func newFromJSONData(data []byte) (testsuite.Suite, error) {
+// NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
+func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
 	return New()
 }
 
@@ -23,5 +24,5 @@ func (s *Suite) Run(r testsuite.Report) {
 }
 
 func init() {
-	testsuite.Register("GRPC", newFromJSONData)
+	testsuite.Register("GRPC", NewSuiteFromJSON)
 }
