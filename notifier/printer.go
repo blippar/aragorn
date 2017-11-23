@@ -17,12 +17,6 @@ func NewPrinter() Notifier {
 }
 
 func (*printer) Notify(r *Report) {
-	log.Info("test suite done",
-		zap.String("name", r.name),
-		zap.Time("started_at", r.start),
-		zap.Duration("duration", r.duration),
-		zap.Int("nb_tests", len(r.tests)),
-	)
 	for _, tr := range r.tests {
 		fields := []zapcore.Field{
 			zap.String("test_sute", r.name),
@@ -37,4 +31,10 @@ func (*printer) Notify(r *Report) {
 		}
 		log.Info(msg, fields...)
 	}
+	log.Info("test suite done",
+		zap.String("name", r.name),
+		zap.Time("started_at", r.start),
+		zap.Duration("duration", r.duration),
+		zap.Int("nb_tests", len(r.tests)),
+	)
 }
