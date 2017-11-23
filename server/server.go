@@ -88,11 +88,14 @@ func (s *Server) walkFn(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		return err
 	}
-	if strings.HasSuffix(path, testSuiteJSONSuffix) {
-		if err := s.newTestSuiteFromDisk(path, !s.cfg.RunOnce); err != nil {
-			log.Error("could not add test suite", zap.String("file", path), zap.Error(err))
-			return nil
-		}
+	if !strings.HasSuffix(path, testSuiteJSONSuffix) {
+		return nil
+	}
+	if err := s.newTestSuiteFromDisk(path, s.cfg.RunOnce); err != nil {
+		log.Error("could not add test suite", zap.String("file", path), zap.Error(err))
+		return nil
+	}
+	if !s.cfg.RunOnce {
 		log.Info("test suite added", zap.String("file", path))
 	}
 	return nil
