@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/jmoiron/jsonq"
-	"github.com/santhosh-tekuri/jsonschema"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // Logger logs error.
@@ -25,6 +25,9 @@ type Response struct {
 	// HTTP response body, this is required because some
 	// verifications need to read the body multiple times.
 	body []byte
+
+	dataJSON      interface{}
+	dataJSONError bool
 }
 
 // NewResponse returns a new response on which you can have expectations.
@@ -65,23 +68,27 @@ func (r *Response) MatchRawDocument(doc []byte) {
 
 // MatchJSONDocument checks whether the JSON response body matches the given document.
 func (r *Response) MatchJSONDocument(doc interface{}) {
-	var resp interface{}
-	if err := json.Unmarshal(r.body, &resp); err != nil {
-		r.logger.Errorf("could not decode JSON response body: %v", err)
+	if !r.unmarshalJSONBody() {
 		return
 	}
-	if !cmp.Equal(resp, doc) {
+	if !cmp.Equal(doc, r.dataJSON) {
 		r.logger.Error("request body does not match document")
 	}
 }
 
 // MatchJSONSchema checks whether the JSON formated response body matches the given JSON schema.
-func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
-	br := bytes.NewReader(r.body)
-	if err := schema.Validate(br); err != nil {
-		if e, ok := err.(*jsonschema.ValidationError); ok {
-			r.logger.Errorf("wrong JSON schema: %v", e)
-		} else {
+func (r *Response) MatchJSONSchema(schema *gojsonschema.Schema) {
+	if !r.unmarshalJSONBody() {
+		return
+	}
+	data := gojsonschema.NewGoLoader(r.dataJSON)
+	result, err := schema.Validate(data)
+	if err != nil {
+		r.logger.Errorf("JSON schema validation failed: %v", err)
+		return
+	}
+	if !result.Valid() {
+		for _, err := range result.Errors() {
 			r.logger.Errorf("JSON schema validation failed: %v", err)
 		}
 	}
@@ -90,12 +97,10 @@ func (r *Response) MatchJSONSchema(schema *jsonschema.Schema) {
 // ContainsJSONValues checks that the JSON formated response body contains
 // specific values at given keys.
 func (r *Response) ContainsJSONValues(values map[string]interface{}) {
-	var data interface{}
-	if err := json.Unmarshal(r.body, &data); err != nil {
-		r.logger.Errorf("could not decode JSON body: %v", err)
+	if !r.unmarshalJSONBody() {
 		return
 	}
-	jq := jsonq.NewQuery(data)
+	jq := jsonq.NewQuery(r.dataJSON)
 	for key, expected := range values {
 		val, err := jq.Interface(strings.Split(key, ".")...)
 		if err != nil {
@@ -106,4 +111,19 @@ func (r *Response) ContainsJSONValues(values map[string]interface{}) {
 			r.logger.Errorf("wrong value for key %q (got %v; want %v)", key, val, expected)
 		}
 	}
+}
+
+func (r *Response) unmarshalJSONBody() bool {
+	if r.dataJSON != nil {
+		return true
+	}
+	if r.dataJSONError {
+		return false
+	}
+	if err := json.Unmarshal(r.body, &r.dataJSON); err != nil {
+		r.logger.Errorf("could not decode JSON response body: %v", err)
+		r.dataJSONError = true
+		return false
+	}
+	return true
 }

@@ -19,10 +19,19 @@ func (cfg *Config) setHTTPRequest(t *test, req *Request) error {
 	var cntType string
 	var err error
 	if req.Body != nil {
-		t.body, err = cfg.fromBody(req.Body)
+		v, err := cfg.getDocumentField(req.Body)
 		if err != nil {
 			return err
 		}
+		body, ok := v.([]byte)
+		if !ok {
+			body, err = json.Marshal(v)
+			if err != nil {
+				return err
+			}
+			cntType = "application/json; charset=utf-8"
+		}
+		t.body = body
 	} else if req.Multipart != nil {
 		t.body, cntType, err = cfg.fromMultipart(req.Multipart)
 		if err != nil {
@@ -59,7 +68,7 @@ func (cfg *Config) setHTTPRequest(t *test, req *Request) error {
 	for k, v := range req.Header {
 		t.req.Header.Set(k, v)
 	}
-	if cntType != "" {
+	if cntType != "" && t.req.Header.Get("Content-Type") == "" {
 		t.req.Header.Set("Content-Type", cntType)
 	}
 	return nil

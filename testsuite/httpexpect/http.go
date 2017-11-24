@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/santhosh-tekuri/jsonschema"
-
+	"github.com/xeipuuv/gojsonschema"
+	
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -37,7 +37,7 @@ type test struct {
 	header     Header
 
 	document   interface{}
-	jsonSchema *jsonschema.Schema     // Compiled jsonschema.
+	jsonSchema *gojsonschema.Schema   // Compiled jsonschema.
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
 

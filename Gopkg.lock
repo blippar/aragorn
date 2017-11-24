@@ -27,9 +27,21 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/santhosh-tekuri/jsonschema"
-  packages = [".","formats","loader"]
-  revision = "1d461e6faf3a8748e96af0d198ed535a3b28b35d"
+  name = "github.com/xeipuuv/gojsonpointer"
+  packages = ["."]
+  revision = "6fe8760cad3569743d51ddbb243b26f8456742dc"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/xeipuuv/gojsonreference"
+  packages = ["."]
+  revision = "e02fc20de94c78484cd5ffb007f8af96be030a45"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/xeipuuv/gojsonschema"
+  packages = ["."]
+  revision = "212d8a0df7acfab8bdd190a7a69f0ab7376edcc8"
 
 [[projects]]
   name = "go.uber.org/atomic"
@@ -58,6 +70,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f347b0659b0264af6ece8ddc353634cb5672d14a810b96f665803deb2624e808"
+  inputs-digest = "04d077d88652404ab4d7ded627fa67369a4adad22711b9208381b36012dd6e3b"
   solver-name = "gps-cdcl"
   solver-version = 1

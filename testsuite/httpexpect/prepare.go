@@ -1,18 +1,17 @@
 package httpexpect
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/santhosh-tekuri/jsonschema"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type Config struct {
@@ -48,9 +47,9 @@ type Expect struct {
 	StatusCode int
 	Header     Header
 
-	Document   interface{}     // Exact document to match. Exclusive with JSONSchema.
-	JSONSchema json.RawMessage // Exact JSON schema to match. Exclusive with Document.
-	JSONValues interface{}     // Required JSON values. Optional, if JSONSchema is set.
+	Document   interface{}            // Exact document to match. Exclusive with JSONSchema.
+	JSONSchema map[string]interface{} // Exact JSON schema to match. Exclusive with Document.
+	JSONValues map[string]interface{} // Required JSON values. Optional, if JSONSchema is set.
 }
 
 // A Header represents the key-value pairs in an HTTP header.
@@ -129,26 +128,22 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 	}
 
 	if t.Expect.JSONSchema != nil {
-		r, err := cfg.getReaderFromJSONRawMessage(t.Expect.JSONSchema)
+		m, err := cfg.getObjectField(t.Expect.JSONSchema)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON schema: %v", err))
+			errs = append(errs, fmt.Sprintf("- expect: could get JSON schema: %v", err))
 		} else {
-			cc := jsonschema.NewCompiler()
-			// NOTE: the parameter "schema.json" is not relevent.
-			cc.AddResource("schema.json", r)
-			test.jsonSchema, err = cc.Compile("schema.json")
+			schemaLoader := gojsonschema.NewGoLoader(m)
+			test.jsonSchema, err = gojsonschema.NewSchema(schemaLoader)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("- expect: could not compile JSON schema: %v", err))
+				errs = append(errs, fmt.Sprintf("- expect: could not load JSON schema: %v", err))
 			}
 		}
 	}
 
 	if t.Expect.JSONValues != nil {
-		v, err := cfg.getDocumentField(t.Expect.JSONValues)
+		m, err := cfg.getObjectField(t.Expect.JSONValues)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("- expect: could get reader for JSON values: %v", err))
-		} else if m, ok := v.(map[string]interface{}); !ok {
-			errs = append(errs, fmt.Sprintf("- expect: invalid JSON Values type: must be an object"))
+			errs = append(errs, fmt.Sprintf("- expect: could get JSON values: %v", err))
 		} else {
 			test.jsonValues = m
 		}
@@ -161,38 +156,46 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 }
 
 func (cfg *Config) getDocumentField(v interface{}) (interface{}, error) {
-	s, ok := v.(string)
+	m, ok := v.(map[string]interface{})
 	if !ok {
 		return v, nil
 	}
-	if !strings.HasPrefix(s, "@") {
-		return []byte(s), nil
+	rawI, _ := m["$raw"]
+	if rawStr, ok := rawI.(string); ok {
+		return []byte(rawStr), nil
 	}
-	path := cfg.getFilePath(s[1:])
-	data, err := ioutil.ReadFile(path)
+	ref, ok := m["$ref"].(string)
+	if !ok {
+		return v, nil
+	}
+	path := cfg.getFilePath(ref)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	var newVal interface{}
-	if err := json.Unmarshal(data, &newVal); err != nil {
-		return nil, err
+	defer f.Close()
+	if raw, _ := m["$raw"].(bool); raw {
+		return ioutil.ReadAll(f)
 	}
-	return newVal, nil
+	var newVal interface{}
+	err = json.NewDecoder(f).Decode(&newVal)
+	return newVal, err
 }
 
-// getReaderFromJSONRawMessage returns an io.Reader from a byte slice, or from a file if
-// the byte slice starts with the characters '"@'.
-func (cfg *Config) getReaderFromJSONRawMessage(val []byte) (io.Reader, error) {
-	s := string(val)
-	if strings.HasPrefix(s, `"@`) && strings.HasSuffix(s, `"`) {
-		path := cfg.getFilePath(s[2 : len(s)-1])
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		val = data
+func (cfg *Config) getObjectField(m map[string]interface{}) (map[string]interface{}, error) {
+	ref, ok := m["$ref"].(string)
+	if !ok {
+		return m, nil
 	}
-	return bytes.NewReader(val), nil
+	path := cfg.getFilePath(ref)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var newVal map[string]interface{}
+	err = json.NewDecoder(f).Decode(&newVal)
+	return newVal, err
 }
 
 func (cfg *Config) getFilePath(path string) string {
