@@ -17,24 +17,24 @@ func NewPrinter() Notifier {
 }
 
 func (*printer) Notify(r *Report) {
-	for _, tr := range r.tests {
+	for _, tr := range r.Tests {
 		fields := []zapcore.Field{
-			zap.String("test_sute", r.name),
-			zap.String("name", tr.name),
-			zap.Time("started_at", tr.start),
-			zap.Duration("duration", tr.duration),
+			zap.String("test_sute", r.Name),
+			zap.String("name", tr.Name),
+			zap.Time("started_at", tr.Start),
+			zap.Duration("duration", tr.Duration),
 		}
 		msg := "test passed"
-		if len(tr.errs) > 0 {
+		if len(tr.Errs) > 0 {
 			msg = "test failed"
-			fields = append(fields, zap.Errors("errs", tr.errs))
+			fields = append(fields, zap.Errors("errs", tr.Errs))
 		}
 		log.Info(msg, fields...)
 	}
 	log.Info("test suite done",
-		zap.String("name", r.name),
-		zap.Time("started_at", r.start),
-		zap.Duration("duration", r.duration),
-		zap.Int("nb_tests", len(r.tests)),
+		zap.String("name", r.Name),
+		zap.Time("started_at", r.Start),
+		zap.Duration("duration", r.Duration),
+		zap.Int("nb_tests", len(r.Tests)),
 	)
 }

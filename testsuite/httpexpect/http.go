@@ -1,7 +1,6 @@
 package httpexpect
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,7 +8,7 @@ import (
 	"time"
 
 	"github.com/xeipuuv/gojsonschema"
-	
+
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -31,7 +30,6 @@ type Suite struct {
 type test struct {
 	name string
 	req  *http.Request // Raw HTTP request generated from the request description.
-	body []byte        // Bytes buffer from which the httpReq Body will be read from on each request.
 
 	statusCode int
 	header     Header
@@ -45,23 +43,17 @@ type test struct {
 type RunOption func(*Suite)
 
 // New returns a Suite.
-func New(cfg *Config, opts ...RunOption) (*Suite, error) {
+func New(cfg *Config) (*Suite, error) {
 	tests, err := cfg.genTests()
 	if err != nil {
 		return nil, err
 	}
-	s := &Suite{
-		tests: tests,
-
-		client: http.DefaultClient,
-
+	return &Suite{
+		tests:      tests,
+		client:     http.DefaultClient,
 		retryCount: defaultRetryCount,
 		retryWait:  defaultRetryWait,
-	}
-	for _, opt := range opts {
-		opt(s)
-	}
-	return s, nil
+	}, nil
 }
 
 // NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
@@ -72,21 +64,6 @@ func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
 	}
 	cfg.Path = path
 	return New(cfg)
-}
-
-// WithHTTPClient can be used to specify the http.Client to use when making HTTP requests.
-func WithHTTPClient(c *http.Client) RunOption {
-	return func(s *Suite) {
-		s.client = c
-	}
-}
-
-// WithRetryPolicy can be used to specify the retry policy to use when making HTTP requests.
-func WithRetryPolicy(n int, wait time.Duration) RunOption {
-	return func(s *Suite) {
-		s.retryCount = n
-		s.retryWait = wait
-	}
 }
 
 // Run runs all the tests in the suite.
@@ -101,21 +78,21 @@ func (s *Suite) Run(r testsuite.Report) {
 // runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
-func (s *Suite) runTestWithRetry(t *test, tr testsuite.TestReport) {
+func (s *Suite) runTestWithRetry(t *test, l Logger) {
 	for attempt := 1; ; attempt++ {
-		err := s.runTest(t, tr)
+		err := s.runTest(t, l)
 		if err == nil {
 			return
 		}
 		if attempt > s.retryCount {
-			tr.Errorf("could not run test after %d attempts: %v", attempt, err)
+			l.Errorf("could not run test after %d attempts: %v", attempt, err)
 			return
 		}
 		time.Sleep(s.retryWait * time.Duration(attempt))
 	}
 }
 
-func (s *Suite) runTest(t *test, tr testsuite.TestReport) error {
+func (s *Suite) runTest(t *test, l Logger) error {
 	req := t.cloneRequest()
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -126,7 +103,7 @@ func (s *Suite) runTest(t *test, tr testsuite.TestReport) error {
 	if err != nil {
 		return fmt.Errorf("could not read body: %v", err)
 	}
-	r := NewResponse(tr, resp, body)
+	r := NewResponse(l, resp, body)
 	r.StatusCode(t.statusCode)
 	r.ContainsHeader(t.header)
 	if t.document != nil {
@@ -158,8 +135,8 @@ func (t *test) cloneRequest() *http.Request {
 	for k, s := range r.Header {
 		r2.Header[k] = append([]string(nil), s...)
 	}
-	if len(t.body) > 0 {
-		r2.Body = ioutil.NopCloser(bytes.NewReader(t.body))
+	if r.Body != nil {
+		r2.Body, _ = r.GetBody()
 	}
 	return r2
 }

@@ -1,6 +1,8 @@
 package grpcexpect
 
 import (
+	"errors"
+
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/testsuite"
 )
@@ -9,8 +11,8 @@ import (
 type Suite struct{}
 
 // New returns a Suite.
-func New() (testsuite.Suite, error) {
-	return &Suite{}, nil
+func New() (*Suite, error) {
+	return nil, errors.New("Not implemented")
 }
 
 // NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.

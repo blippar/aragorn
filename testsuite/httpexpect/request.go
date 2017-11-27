@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -13,36 +12,12 @@ import (
 	"strings"
 )
 
-// newHTTPRequest returns an htpp.Request from a base and a request.
-func (cfg *Config) setHTTPRequest(t *test, req *Request) error {
-	// Generate request body.
-	var cntType string
-	var err error
-	if req.Body != nil {
-		v, err := cfg.getDocumentField(req.Body)
-		if err != nil {
-			return err
-		}
-		body, ok := v.([]byte)
-		if !ok {
-			body, err = json.Marshal(v)
-			if err != nil {
-				return err
-			}
-			cntType = "application/json; charset=utf-8"
-		}
-		t.body = body
-	} else if req.Multipart != nil {
-		t.body, cntType, err = cfg.fromMultipart(req.Multipart)
-		if err != nil {
-			return err
-		}
-	} else if req.FormData != nil {
-		t.body = fromFormData(req.FormData)
-		cntType = "application/x-www-form-urlencoded"
+// toHTTPRequest returns an http.Request from a base and a request.
+func (req *Request) toHTTPRequest(cfg *Config) (*http.Request, error) {
+	body, cntType, err := req.getBody(cfg)
+	if err != nil {
+		return nil, err
 	}
-
-	// Create http request.
 	method := req.Method
 	if method == "" {
 		method = http.MethodGet
@@ -51,39 +26,56 @@ func (cfg *Config) setHTTPRequest(t *test, req *Request) error {
 	if path == "" {
 		path = "/"
 	}
-	var url string
+	var urlStr string
 	if req.URL != "" {
-		url = req.URL + path
+		urlStr = req.URL + path
 	} else {
-		url = cfg.Base.URL + path
+		urlStr = cfg.Base.URL + path
 	}
-	t.req, err = http.NewRequest(method, url, nil)
+	httpReq, err := http.NewRequest(method, urlStr, body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	for k, v := range cfg.Base.Header {
-		t.req.Header.Set(k, v)
+	cfg.Base.Header.addToRequest(httpReq)
+	req.Header.addToRequest(httpReq)
+	if cntType != "" && httpReq.Header.Get("Content-Type") == "" {
+		httpReq.Header.Set("Content-Type", cntType)
 	}
-	for k, v := range req.Header {
-		t.req.Header.Set(k, v)
-	}
-	if cntType != "" && t.req.Header.Get("Content-Type") == "" {
-		t.req.Header.Set("Content-Type", cntType)
-	}
-	return nil
+	return httpReq, nil
 }
 
-func (cfg *Config) fromBody(body interface{}) ([]byte, error) {
-	s, ok := body.(string)
-	if !ok {
-		return json.Marshal(body)
+func (req *Request) getBody(cfg *Config) (io.Reader, string, error) {
+	var (
+		body    []byte
+		cntType string
+	)
+	if req.Body != nil {
+		v, err := cfg.getDocumentField(req.Body)
+		if err != nil {
+			return nil, "", err
+		}
+		var ok bool
+		body, ok = v.([]byte)
+		if !ok {
+			body, err = json.Marshal(v)
+			if err != nil {
+				return nil, "", err
+			}
+			cntType = "application/json; charset=utf-8"
+		}
+	} else if req.Multipart != nil {
+		var err error
+		body, cntType, err = cfg.fromMultipart(req.Multipart)
+		if err != nil {
+			return nil, "", err
+		}
+	} else if req.FormData != nil {
+		body = fromFormData(req.FormData)
+		cntType = "application/x-www-form-urlencoded"
+	} else {
+		return nil, "", nil
 	}
-	if !strings.HasPrefix(s, "@") {
-		return []byte(s), nil
-	}
-	path := cfg.getFilePath(s[1:])
-	return ioutil.ReadFile(path)
+	return bytes.NewReader(body), cntType, nil
 }
 
 func (cfg *Config) fromMultipart(m map[string]string) ([]byte, string, error) {

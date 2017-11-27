@@ -1,4 +1,4 @@
-package notifier
+package slack
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/blippar/aragorn/log"
+	"github.com/blippar/aragorn/notifier"
 )
 
 const (
@@ -50,8 +51,8 @@ type slackNotifier struct {
 	channel  string
 }
 
-// NewSlackNotifier returns a new SlackNotifier given a Slack webhook and a test suite name.
-func NewSlackNotifier(webhook, username, channel string) Notifier {
+// New returns a new SlackNotifier given a Slack webhook and a test suite name.
+func New(webhook, username, channel string) notifier.Notifier {
 	return &slackNotifier{
 		webhook:  webhook,
 		username: username,
@@ -60,10 +61,10 @@ func NewSlackNotifier(webhook, username, channel string) Notifier {
 }
 
 // SuiteDone implements the Notifier interface.
-func (sn *slackNotifier) Notify(r *Report) {
+func (sn *slackNotifier) Notify(r *notifier.Report) {
 	errors := 0
-	for _, tr := range r.tests {
-		errors += len(tr.errs)
+	for _, tr := range r.Tests {
+		errors += len(tr.Errs)
 	}
 	// Only send a Slack notification if something went wrong.
 	if errors == 0 {
@@ -77,20 +78,20 @@ func (sn *slackNotifier) Notify(r *Report) {
 	notif := &notification{
 		Username: sn.username,
 		Channel:  sn.channel,
-		Text:     fmt.Sprintf("*%s* - %d %s failed", r.name, errors, test),
+		Text:     fmt.Sprintf("*%s* - %d %s failed", r.Name, errors, test),
 	}
 
-	for _, tr := range r.tests {
-		if len(tr.errs) == 0 {
+	for _, tr := range r.Tests {
+		if len(tr.Errs) == 0 {
 			continue
 		}
 		a := attachment{
 			MrkdwnIn: []string{"fields"},
-			Fallback: tr.name + " failed",
+			Fallback: tr.Name + " failed",
 			Color:    redColor,
-			Title:    fmt.Sprintf("Test %q failed (%v):", tr.name, tr.duration),
+			Title:    fmt.Sprintf("Test %q failed (%v):", tr.Name, tr.Duration),
 		}
-		for _, err := range tr.errs {
+		for _, err := range tr.Errs {
 			a.Fields = append(a.Fields, attachmentField{
 				Value: fmt.Sprintf("```%v```", err),
 			})

@@ -55,6 +55,12 @@ type Expect struct {
 // A Header represents the key-value pairs in an HTTP header.
 type Header map[string]string
 
+func (h Header) addToRequest(req *http.Request) {
+	for k, v := range h {
+		req.Header.Set(k, v)
+	}
+}
+
 // prepare verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
 func (cfg *Config) genTests() ([]*test, error) {
@@ -70,7 +76,7 @@ func (cfg *Config) genTests() ([]*test, error) {
 	ts := make([]*test, len(cfg.Tests))
 	var errs []string
 	for i, test := range cfg.Tests {
-		t, err := cfg.prepareTest(test)
+		t, err := test.prepare(cfg)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("test %q:\n%v", test.Name, err))
 		}
@@ -82,13 +88,15 @@ func (cfg *Config) genTests() ([]*test, error) {
 	return ts, nil
 }
 
-func (cfg *Config) prepareTest(t *Test) (*test, error) {
+func (t *Test) prepare(cfg *Config) (*test, error) {
 	test := &test{
 		name:       t.Name,
 		statusCode: t.Expect.StatusCode,
-		header:     t.Expect.Header,
+		header:     make(Header),
 	}
 	var errs []string
+
+	copyHeader(test.header, t.Expect.Header)
 
 	set := 0
 	if t.Request.Body != nil {
@@ -104,8 +112,10 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 		errs = append(errs, "- request: at most one of body, multipart or formURLEncoded can be set at once")
 	}
 
-	if err := cfg.setHTTPRequest(test, &t.Request); err != nil {
+	if httpReq, err := t.Request.toHTTPRequest(cfg); err != nil {
 		errs = append(errs, fmt.Sprintf("- request: could not create HTTP request: %v", err))
+	} else {
+		test.req = httpReq
 	}
 
 	if test.statusCode == 0 {
@@ -147,6 +157,12 @@ func (cfg *Config) prepareTest(t *Test) (*test, error) {
 		} else {
 			test.jsonValues = m
 		}
+	}
+
+	_, rawDoc := t.Expect.Document.([]byte)
+	accept := test.req.Header.Get("Accept")
+	if accept == "" && (t.Expect.JSONSchema != nil || t.Expect.JSONValues != nil || (t.Expect.Document != nil && !rawDoc)) {
+		test.req.Header.Set("Accept", "application/json")
 	}
 
 	if err := concatErrors(errs); err != nil {
@@ -203,6 +219,12 @@ func (cfg *Config) getFilePath(path string) string {
 		return path
 	}
 	return filepath.Join(cfg.Path, path)
+}
+
+func copyHeader(dest, src Header) {
+	for k, v := range src {
+		dest[k] = v
+	}
 }
 
 func concatErrors(errs []string) error {

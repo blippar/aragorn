@@ -14,51 +14,51 @@ type Notifier interface {
 }
 
 type Report struct {
-	name     string
-	start    time.Time
-	duration time.Duration
-	tests    []*TestReport
+	Name     string
+	Start    time.Time
+	Duration time.Duration
+	Tests    []*TestReport
 }
 
 type TestReport struct {
-	name     string
-	start    time.Time
-	duration time.Duration
-	errs     []error
+	Name     string
+	Start    time.Time
+	Duration time.Duration
+	Errs     []error
 }
 
 func NewReport(name string) *Report {
 	return &Report{
-		name:  name,
-		start: time.Now(),
+		Name:  name,
+		Start: time.Now(),
 	}
 }
 
 func (r *Report) AddTest(name string) testsuite.TestReport {
 	tr := newTestReport(name)
-	r.tests = append(r.tests, tr)
+	r.Tests = append(r.Tests, tr)
 	return tr
 }
 
 func (r *Report) Done() {
-	r.duration = time.Since(r.start)
+	r.Duration = time.Since(r.Start)
 }
 
 func newTestReport(name string) *TestReport {
 	return &TestReport{
-		name:  name,
-		start: time.Now(),
+		Name:  name,
+		Start: time.Now(),
 	}
 }
 
 func (tr *TestReport) Error(args ...interface{}) {
-	tr.errs = append(tr.errs, errors.New(fmt.Sprint(args...)))
+	tr.Errs = append(tr.Errs, errors.New(fmt.Sprint(args...)))
 }
 
 func (tr *TestReport) Errorf(format string, args ...interface{}) {
-	tr.errs = append(tr.errs, fmt.Errorf(format, args...))
+	tr.Errs = append(tr.Errs, fmt.Errorf(format, args...))
 }
 
 func (tr *TestReport) Done() {
-	tr.duration = time.Since(tr.start)
+	tr.Duration = time.Since(tr.Start)
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blippar/aragorn/notifier"
+	"github.com/blippar/aragorn/notifier/slack"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -64,7 +65,7 @@ func (s *Server) newTestSuiteFromDisk(path string, once bool) error {
 	}
 	n := notifier.NewPrinter()
 	if cfg.Slack.Webhook != "" && cfg.Slack.Username != "" && cfg.Slack.Channel != "" {
-		n = notifier.Multi(n, notifier.NewSlackNotifier(cfg.Slack.Webhook, cfg.Slack.Username, cfg.Slack.Channel))
+		n = notifier.Multi(n, slack.New(cfg.Slack.Webhook, cfg.Slack.Username, cfg.Slack.Channel))
 	}
 	dir := filepath.Dir(path)
 	suite, err := newSuite(dir, cfg.Suite)
