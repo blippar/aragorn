@@ -5,21 +5,21 @@ import (
 	"github.com/blippar/aragorn/testsuite"
 )
 
-type suiteRunner struct {
+type SuiteRunner struct {
 	name     string
 	suite    testsuite.Suite
 	notifier notifier.Notifier
 }
 
-func newSuiteRunner(name string, s testsuite.Suite, n notifier.Notifier) *suiteRunner {
-	return &suiteRunner{
+func NewSuiteRunner(name string, s testsuite.Suite, n notifier.Notifier) *SuiteRunner {
+	return &SuiteRunner{
 		name:     name,
 		suite:    s,
 		notifier: n,
 	}
 }
 
-func (sr *suiteRunner) Run() {
+func (sr *SuiteRunner) Run() {
 	report := notifier.NewReport(sr.name)
 	sr.suite.Run(report)
 	report.Done()
