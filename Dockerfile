@@ -1,5 +1,4 @@
-# blippar/aragorn: requires go 1.8+ (time.Until)
-FROM golang:1.8-alpine AS builder
+FROM golang:alpine AS builder
 
 RUN apk add --no-cache make
 

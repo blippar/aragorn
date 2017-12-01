@@ -7,7 +7,7 @@ import (
 
 var l *zap.Logger
 
-func Init(debug bool) (err error) {
+func Init(level string, debug bool) (err error) {
 	var (
 		cfg  zap.Config
 		opts []zap.Option
@@ -18,6 +18,10 @@ func Init(debug bool) (err error) {
 		opts = []zap.Option{zap.AddCallerSkip(1)}
 	} else {
 		cfg = zap.NewProductionConfig()
+		cfg.DisableCaller = true
+		if err := cfg.Level.UnmarshalText([]byte(level)); err != nil {
+			return err
+		}
 	}
 
 	cfg.DisableStacktrace = true

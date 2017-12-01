@@ -6,16 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"go.uber.org/zap"
 
 	"github.com/blippar/aragorn/log"
-	"github.com/blippar/aragorn/notifier"
-	"github.com/blippar/aragorn/notifier/slack"
 	"github.com/blippar/aragorn/scheduler"
-	"github.com/blippar/aragorn/testsuite"
 )
 
 const testSuiteJSONSuffix = ".suite.json"
@@ -23,7 +19,6 @@ const testSuiteJSONSuffix = ".suite.json"
 var (
 	errFSEventsChClosed = errors.New("fsnotify events channel closed")
 	errFSErrorsChClosed = errors.New("fsnotify errors channel closed")
-	errNoSchedulingRule = errors.New("no scheduling rule set in test suite file: please set runCron or runEvery")
 )
 
 type Server struct {
@@ -36,6 +31,9 @@ type Server struct {
 }
 
 func New(dirs []string) *Server {
+	if len(dirs) == 0 {
+		dirs = []string{"."}
+	}
 	return &Server{
 		dirs: dirs,
 		sch:  scheduler.New(),
@@ -46,7 +44,7 @@ func (s *Server) Start() error {
 	s.doneCh = make(chan struct{})
 	s.stopCh = make(chan struct{})
 
-	if err := s.loadDirs(false); err != nil {
+	if err := s.loadDirs(); err != nil {
 		return err
 	}
 
@@ -72,26 +70,68 @@ func (s *Server) Wait() <-chan struct{} {
 	return s.doneCh
 }
 
-func (s *Server) RunTests() error {
-	return s.loadDirs(true)
-}
-
-func (s *Server) loadDirs(once bool) error {
+func (s *Server) List() error {
 	walkFn := func(path string, info os.FileInfo, err error) error {
-		// NOTE: All errors that arise visiting files and directories are filtered by walkFn.
 		if err != nil {
 			return err
 		}
 		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
 			return nil
 		}
-		if err := s.addTestSuite(path, once); err != nil {
+		suite, err := NewSuiteFromFile(path)
+		if err != nil {
+			log.Error("could not create test suite", zap.String("file", path), zap.Error(err))
+			return nil
+		}
+		log.Info("test suite", zap.String("file", path), zap.String("suite", suite.name), zap.String("type", suite.typ))
+		return nil
+	}
+	for _, dir := range s.dirs {
+		if err := filepath.Walk(dir, walkFn); err != nil {
+			return fmt.Errorf("could not walk %q directory: %v", dir, err)
+		}
+	}
+	return nil
+}
+
+func (s *Server) Exec() error {
+	walkFn := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
+			return nil
+		}
+		suite, err := NewSuiteFromFile(path)
+		if err != nil {
+			log.Error("could not create test suite", zap.String("file", path), zap.Error(err))
+			return nil
+		}
+		log.Info("test suite starting", zap.String("file", path), zap.String("suite", suite.name))
+		suite.Run()
+		return nil
+	}
+	for _, dir := range s.dirs {
+		if err := filepath.Walk(dir, walkFn); err != nil {
+			return fmt.Errorf("could not walk %q directory: %v", dir, err)
+		}
+	}
+	return nil
+}
+
+func (s *Server) loadDirs() error {
+	walkFn := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
+			return nil
+		}
+		if err := s.addTestSuite(path); err != nil {
 			log.Error("could not add test suite", zap.String("file", path), zap.Error(err))
 			return nil
 		}
-		if !once {
-			log.Info("test suite added", zap.String("file", path))
-		}
+		log.Info("test suite added", zap.String("file", path))
 		return nil
 	}
 	log.Info("looking for existing test suite files in directories", zap.Strings("directories", s.dirs))
@@ -103,39 +143,15 @@ func (s *Server) loadDirs(once bool) error {
 	return nil
 }
 
-func (s *Server) addTestSuite(path string, once bool) error {
-	cfg, err := NewSuiteConfigFromFile(path)
+func (s *Server) addTestSuite(path string) error {
+	suite, err := NewSuiteFromFile(path)
 	if err != nil {
 		return err
 	}
-	newSuite, err := testsuite.Get(cfg.Type)
-	if err != nil {
-		return err
+	if suite.runCron != "" {
+		return s.sch.AddCron(path, suite, suite.runCron)
 	}
-	n := notifier.NewPrinter()
-	if cfg.Slack.Webhook != "" && cfg.Slack.Username != "" && cfg.Slack.Channel != "" {
-		n = notifier.Multi(n, slack.New(cfg.Slack.Webhook, cfg.Slack.Username, cfg.Slack.Channel))
-	}
-	dir := filepath.Dir(path)
-	suite, err := newSuite(dir, cfg.Suite)
-	if err != nil {
-		return err
-	}
-	sr := NewSuiteRunner(cfg.Name, suite, n)
-	if once {
-		sr.Run()
-	} else if cfg.RunCron != "" {
-		s.sch.AddCron(path, sr, cfg.RunCron)
-	} else if cfg.RunEvery != "" {
-		d, err := time.ParseDuration(cfg.RunEvery)
-		if err != nil {
-			return fmt.Errorf("could not parse duration in test suite file: %v", err)
-		}
-		s.sch.Add(path, sr, d)
-	} else {
-		return errNoSchedulingRule
-	}
-	return nil
+	return s.sch.Add(path, suite, suite.runEvery)
 }
 
 func (s *Server) removeTestSuite(path string) error {
@@ -191,7 +207,7 @@ func (s *Server) fsWatchEventLoop() error {
 func (s *Server) fsHandleTestSuiteFileEvent(e fsnotify.Event) {
 	switch {
 	case isCreateEvent(e.Op):
-		if err := s.addTestSuite(e.Name, true); err != nil {
+		if err := s.addTestSuite(e.Name); err != nil {
 			log.Error("could not add test suite", zap.String("file", e.Name), zap.Error(err))
 			return
 		}
@@ -207,7 +223,7 @@ func (s *Server) fsHandleTestSuiteFileEvent(e fsnotify.Event) {
 			log.Error("could not remove test suite", zap.String("file", e.Name), zap.Error(err))
 			return
 		}
-		if err := s.addTestSuite(e.Name, true); err != nil {
+		if err := s.addTestSuite(e.Name); err != nil {
 			log.Error("could not create test suite from disk", zap.String("file", e.Name), zap.Error(err))
 			return
 		}
@@ -217,7 +233,7 @@ func (s *Server) fsHandleTestSuiteFileEvent(e fsnotify.Event) {
 
 func (s *Server) fsWatchErrorLoop() error {
 	for err := range s.fsw.Errors {
-		// NOTE: those errors might be fatal, so maybe its would
+		// Those errors might be fatal, so maybe its would
 		// be better to return the first error encountered instead
 		// of just logging it.
 		log.Error("inotify watcher error", zap.Error(err))

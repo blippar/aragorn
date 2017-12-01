@@ -1,13 +1,14 @@
 # Default config
-VERSION   ?= $(shell echo `git describe --tag 2>/dev/null || git rev-parse --short HEAD` | sed -E 's|^v||g')
-VERBOSE   ?= false
-DISTFOLDER = dist
+VERBOSE     ?= false
+VERSION     ?= $(shell echo `git describe --tags --dirty  2>/dev/null || echo devel`)
+COMMIT_HASH = $(shell echo `git rev-parse --short HEAD 2>/dev/null`)
+DATE        = $(shell echo `date "+%Y-%m-%d"`)
 
 # Go configuration
 GOBIN	  := $(shell which go)
 GOENV	  ?=
 GOOPT     ?=
-GOLDF      = -X main.Version=$(VERSION)
+GOLDF      = -s -w -X main.commitHash=$(COMMIT_HASH) -X main.buildDate=$(DATE) -X main.version=$(VERSION)
 
 # Docker configuration
 DOCKBIN   := $(shell which docker)
@@ -38,11 +39,11 @@ $(TARGET):
 # Run tests using GOBIN
 test:
 	$(info >>> Testing ./... using $(GOBIN))
-	@$(GOBIN) test $(GOOPT) ./...
+	@$(GOBIN) test -cover -race $(GOOPT) ./...
 
 # Build binaries staticly
 static: GOLDF += -extldflags "-static"
-static: GOENV += CGO_ENABLED=0 GOOS=linux
+static: GOENV += CGO_ENABLED=0
 static: $(TARGET)
 
 # Docker
@@ -56,4 +57,4 @@ clean:
 	rm -rv $(TARGET)
 
 # Always execute these targets
-.PHONY: all $(TARGET) static test docker clean
+.PHONY: all $(TARGET) test static docker clean
