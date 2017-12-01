@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"runtime"
 )
 
@@ -28,14 +27,14 @@ func (*versionCommand) Hidden() bool      { return false }
 func (*versionCommand) Register(fs *flag.FlagSet) {}
 
 func (*versionCommand) Run(args []string) error {
-	fmt.Printf(`%s:
+	fmt.Printf(`aragorn:
 		version     : %s
 		build date  : %s
 		git hash    : %s
 		go version  : %s
 		go compiler : %s
 		platform    : %s/%s
-`, os.Args[0], version, buildDate, commitHash,
+`, version, buildDate, commitHash,
 		runtime.Version(), runtime.Compiler, runtime.GOOS, runtime.GOARCH)
 	return nil
 }
