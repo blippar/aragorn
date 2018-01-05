@@ -116,12 +116,9 @@ An HTTP test suite contains a base configuration and list of tests.
 | header     | `map[string]string` |          | Expected key-value pairs in the HTTP header. |
 | document   | `Document`          |          | Expected document to be returned.            |
 | jsonSchema | `Object`            |          | Expected JSON schema (1) to be returned.     |
-| jsonValues | `Object`            |          | Specific JSON values (2) to be returned.     |
+| jsonValues | `Object`            |          | Specific JSON values to be returned.         |
 
 1. See [json-schema.org](http://json-schema.org/) for more info.
-1. A set of jq queries : see
-   [this link](https://github.com/jmoiron/jsonq/blob/e874b168d07ecc7808bc950a17998a8aa3141d82/README.md)
-   for more info.
 
 `Document`
 
@@ -169,8 +166,7 @@ every 12h:
 * The first one is a `GET http://localhost:8080/` and expects a 200 JSON
   response `{"key": "value"}`.
 * The second test is a `POST http://localhost:8080/echo` with a JSON body
-  containing `{"key":"value"}`. It expects a JSON response with a Content-Length
-  of 14 and matching the JSON schema `suites/schemas/schema.json`.
+  containing `{"key":"value", "a": [1, 2, 3], "b": {"c": "d"}}`. It expects a JSON response matching the JSON schema `schema.json` and the given JSON values.
 
 ```json
 {
@@ -219,10 +215,14 @@ every 12h:
         "expect": {
           "statusCode": 200,
           "header": {
-            "Content-Type": "application/json",
-            "Content-Length": "15"
+            "Content-Type": "application/json"
           },
-          "jsonSchema": "@suites/schemas/schema.json"
+          "jsonSchema": "@schema.json",
+          "jsonValues": {
+            "key": "value",
+            "a.0": 1,
+            "b.c": "d"
+          }
         }
       }
     ]
