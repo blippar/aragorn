@@ -38,7 +38,7 @@ func (tr *mockLogger) Error(args ...interface{}) {
 }
 
 func (tr *mockLogger) Errorf(format string, args ...interface{}) {
-	tr.errs = append(tr.errs, fmt.Sprintf(format, args))
+	tr.errs = append(tr.errs, fmt.Sprintf(format, args...))
 }
 
 func TestRequestToHTTPRequest(t *testing.T) {
@@ -325,5 +325,86 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	}
 	if len(tr.errs) > 0 {
 		t.Fatalf("unexpected test report errors: %v", tr.errs)
+	}
+}
+
+func TestQueryJSONData(t *testing.T) {
+	m := map[string]interface{}{
+		"hello": "world",
+		"arr":   []interface{}{42, 0, 1},
+		"sub": map[string]interface{}{
+			"a": "b",
+			"c": "d",
+		},
+	}
+	arr := []interface{}{1, 3, 6, "test", "123", map[string]interface{}{"abc": "def"}}
+	tt := []struct {
+		name   string
+		val    interface{}
+		query  string
+		want   interface{}
+		errStr string
+	}{
+		{"obj simple string", m, "hello", "world", ""},
+		{"obj field not found", m, "invalid_key", nil, "invalid_key: object does not contain field"},
+		{"obj sub obj field a", m, "sub.a", "b", ""},
+		{"obj sub obj field not found", m, "sub.d", "", "sub.d: object does not contain field"},
+		{"obj sub arr", m, "arr.0", 42, ""},
+		{"obj sub arr out of bounds", m, "arr.125", 42, "arr.125: array index out of bounds"},
+		{"arr simple int", arr, "0", 1, ""},
+		{"arr simple string", arr, "3", "test", ""},
+		{"arr invalid index", arr, "invalid_index", nil, "invalid_index: invalid array index"},
+		{"arr out of bounds", arr, "1234", nil, "1234: array index out of bounds"},
+		{"arr sub obj field a", arr, "5.abc", "def", ""},
+		{"arr sub obj field not found", arr, "5.d", "", "5.d: object does not contain field"},
+		{"invalid type", nil, "key", nil, "key: invalid type"},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := queryJSONData(tc.query, tc.val)
+			if err != nil {
+				if errStr := err.Error(); errStr != tc.errStr {
+					t.Fatalf("invalid error (got %v; want %v)", errStr, tc.errStr)
+				}
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("invalid lookup value (got %v; want %v)", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLookupJSONData(t *testing.T) {
+	m := map[string]interface{}{"hello": "world"}
+	arr := []interface{}{1, 3, 6, "test", "123"}
+	tt := []struct {
+		name string
+		val  interface{}
+		key  string
+		want interface{}
+	}{
+		{"obj simple string", m, "hello", "world"},
+		{"obj field not found", m, "invalid_key", errObjectFieldNotFound},
+		{"arr simple int", arr, "0", 1},
+		{"arr simple string", arr, "3", "test"},
+		{"arr invalid index", arr, "invalid_index", errInvalidArrayIndex},
+		{"arr out of bounds", arr, "1234", errIndexOutOfBounds},
+		{"invalid type", nil, "key", errInvalidType},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := lookupJSONData(tc.key, tc.val)
+			if err != nil {
+				e, _ := tc.want.(error)
+				if err != e {
+					t.Fatalf("invalid error (got %v; want %v)", err, e)
+				}
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("invalid lookup value (got %v; want %v)", got, tc.want)
+			}
+		})
 	}
 }
