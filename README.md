@@ -193,9 +193,9 @@ every 12h:
         "Accept-Encoding": "application/json"
       },
       "oauth2": {
-        "ClientID": "id",
-        "ClientSecret": "secret",
-        "TokenURL": "https://localhost:8080/token"
+        "clientID": "id",
+        "clientSecret": "secret",
+        "tokenURL": "https://localhost:8080/token"
       }
     },
     "tests": [
