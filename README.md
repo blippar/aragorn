@@ -38,7 +38,7 @@ The directories to watch can be specified via command line positional arguments
 
 You can humanize the log output with `-humanize`.
 
-## test suites
+## Test Suites
 
 ### Creating a test suite
 
@@ -55,7 +55,7 @@ configuration fields and of the test suite itself, that depends on the type set
 | slack.webhook  | `string`                   |    ✔️    | A Slack webhook used to post notifications in case this test suite fails.                                                             |
 | slack.username | `string`                   |    ✔️    | A Slack username used to post notifications in case this test suite fails.                                                            |
 | slack.channel  | `string`                   |    ✔️    | A Slack channel used to post notifications in case this test suite fails.                                                             |
-| suite          | `HTTPsuite` or `GRPCSuite` |    ✔️    | An object describing the test suite itself. Depends on the field `type`.                                                              |
+| suite          | `HTTPSuite` or `GRPCSuite` |    ✔️    | An object describing the test suite itself. Depends on the field `type`.                                                              |
 
 Example :
 
@@ -82,14 +82,14 @@ An HTTP test suite contains a base configuration and list of tests.
 | base  | `HTTPBase`   |    ✔️    | Base description of the tests in this suite like base URL or HTTP header to add too all requests |
 | tests | `[]HTTPTest` |    ✔️    | List of tests to run.                                                                            |
 
-`HTTPBase`
+##### HTTPBase
 
 | Name   | Type                | Required | Description                                                                                            |
 | ------ | ------------------- | :------: | ------------------------------------------------------------------------------------------------------ |
 | url    | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                 |
 | header | `map[string]string` |          | List of header to add to every test in this suite. Each test can overwrite a header set at this level. |
 
-`HTTPTest`
+##### HTTPTest
 
 | Name    | Type          | Required | Description                                            |
 | ------- | ------------- | :------: | ------------------------------------------------------ |
@@ -97,7 +97,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | request | `HTTPRequest` |    ✔️    | Description of the HTTP request to perform.            |
 | expect  | `HTTPExpect`  |    ✔️    | Expected result of the HTTP request.                   |
 
-`HTTPRequest`
+##### HTTPRequest
 
 | Name      | Type                | Required | Description                                                             |
 | --------- | ------------------- | :------: | ----------------------------------------------------------------------- |
@@ -108,7 +108,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | formData  | `map[string]string` |          | Form data as application/x-url-encoded format.                          |
 | body      | `Document`          |          | Request body.                                                           |
 
-`HTTPExpect`
+##### HTTPExpect
 
 | Name       | Type                | Required | Description                                  |
 | ---------- | ------------------- | :------: | -------------------------------------------- |
@@ -120,7 +120,7 @@ An HTTP test suite contains a base configuration and list of tests.
 
 1. See [json-schema.org](http://json-schema.org/) for more info.
 
-`Document`
+##### Document
 
 Document is any type with some special behaviors like reference.
 
@@ -149,7 +149,7 @@ Inline RAW document:
 }
 ```
 
-`Object`
+##### Object
 
 Object must be a JSON object (`map[string]interface{}`). It can load a JSON
 object from a file (see `Document` doc).
