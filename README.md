@@ -38,7 +38,7 @@ The directories to watch can be specified via command line positional arguments
 
 You can humanize the log output with `-humanize`.
 
-## test suites
+## Test Suites
 
 ### Creating a test suite
 
@@ -55,7 +55,7 @@ configuration fields and of the test suite itself, that depends on the type set
 | slack.webhook  | `string`                   |    ✔️    | A Slack webhook used to post notifications in case this test suite fails.                                                             |
 | slack.username | `string`                   |    ✔️    | A Slack username used to post notifications in case this test suite fails.                                                            |
 | slack.channel  | `string`                   |    ✔️    | A Slack channel used to post notifications in case this test suite fails.                                                             |
-| suite          | `HTTPsuite` or `GRPCSuite` |    ✔️    | An object describing the test suite itself. Depends on the field `type`.                                                              |
+| suite          | `HTTPSuite` or `GRPCSuite` |    ✔️    | An object describing the test suite itself. Depends on the field `type`.                                                              |
 
 Example :
 
@@ -82,14 +82,14 @@ An HTTP test suite contains a base configuration and list of tests.
 | base  | `HTTPBase`   |    ✔️    | Base description of the tests in this suite like base URL or HTTP header to add too all requests |
 | tests | `[]HTTPTest` |    ✔️    | List of tests to run.                                                                            |
 
-`HTTPBase`
+##### HTTPBase
 
 | Name   | Type                | Required | Description                                                                                            |
 | ------ | ------------------- | :------: | ------------------------------------------------------------------------------------------------------ |
 | url    | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                 |
 | header | `map[string]string` |          | List of header to add to every test in this suite. Each test can overwrite a header set at this level. |
 
-`HTTPTest`
+##### HTTPTest
 
 | Name    | Type          | Required | Description                                            |
 | ------- | ------------- | :------: | ------------------------------------------------------ |
@@ -97,7 +97,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | request | `HTTPRequest` |    ✔️    | Description of the HTTP request to perform.            |
 | expect  | `HTTPExpect`  |    ✔️    | Expected result of the HTTP request.                   |
 
-`HTTPRequest`
+##### HTTPRequest
 
 | Name      | Type                | Required | Description                                                             |
 | --------- | ------------------- | :------: | ----------------------------------------------------------------------- |
@@ -108,7 +108,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | formData  | `map[string]string` |          | Form data as application/x-url-encoded format.                          |
 | body      | `Document`          |          | Request body.                                                           |
 
-`HTTPExpect`
+##### HTTPExpect
 
 | Name       | Type                | Required | Description                                  |
 | ---------- | ------------------- | :------: | -------------------------------------------- |
@@ -116,14 +116,11 @@ An HTTP test suite contains a base configuration and list of tests.
 | header     | `map[string]string` |          | Expected key-value pairs in the HTTP header. |
 | document   | `Document`          |          | Expected document to be returned.            |
 | jsonSchema | `Object`            |          | Expected JSON schema (1) to be returned.     |
-| jsonValues | `Object`            |          | Specific JSON values (2) to be returned.     |
+| jsonValues | `Object`            |          | Specific JSON values to be returned.         |
 
 1. See [json-schema.org](http://json-schema.org/) for more info.
-1. A set of jq queries : see
-   [this link](https://github.com/jmoiron/jsonq/blob/e874b168d07ecc7808bc950a17998a8aa3141d82/README.md)
-   for more info.
 
-`Document`
+##### Document
 
 Document is any type with some special behaviors like reference.
 
@@ -152,7 +149,7 @@ Inline RAW document:
 }
 ```
 
-`Object`
+##### Object
 
 Object must be a JSON object (`map[string]interface{}`). It can load a JSON
 object from a file (see `Document` doc).
@@ -169,8 +166,7 @@ every 12h:
 * The first one is a `GET http://localhost:8080/` and expects a 200 JSON
   response `{"key": "value"}`.
 * The second test is a `POST http://localhost:8080/echo` with a JSON body
-  containing `{"key":"value"}`. It expects a JSON response with a Content-Length
-  of 14 and matching the JSON schema `suites/schemas/schema.json`.
+  containing `{"key":"value", "a": [1, 2, 3], "b": {"c": "d"}}`. It expects a JSON response matching the JSON schema `schema.json` and the given JSON values.
 
 ```json
 {
@@ -219,10 +215,14 @@ every 12h:
         "expect": {
           "statusCode": 200,
           "header": {
-            "Content-Type": "application/json",
-            "Content-Length": "15"
+            "Content-Type": "application/json"
           },
-          "jsonSchema": "@suites/schemas/schema.json"
+          "jsonSchema": "@schema.json",
+          "jsonValues": {
+            "key": "value",
+            "a.0": 1,
+            "b.c": "d"
+          }
         }
       }
     ]

@@ -21,12 +21,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/jmoiron/jsonq"
-  packages = ["."]
-  revision = "e874b168d07ecc7808bc950a17998a8aa3141d82"
-
-[[projects]]
-  branch = "master"
   name = "github.com/xeipuuv/gojsonpointer"
   packages = ["."]
   revision = "6fe8760cad3569743d51ddbb243b26f8456742dc"
@@ -70,6 +64,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "04d077d88652404ab4d7ded627fa67369a4adad22711b9208381b36012dd6e3b"
+  inputs-digest = "f3fb11a33cf2f23d5e31bc91e192556d2742b9ea568de7d09e5c440d136f0428"
   solver-name = "gps-cdcl"
   solver-version = 1

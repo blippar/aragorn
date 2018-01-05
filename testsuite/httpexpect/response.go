@@ -3,12 +3,21 @@ package httpexpect
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/jmoiron/jsonq"
 	"github.com/xeipuuv/gojsonschema"
+)
+
+var (
+	errInvalidArrayIndex   = errors.New("invalid array index")
+	errIndexOutOfBounds    = errors.New("array index out of bounds")
+	errObjectFieldNotFound = errors.New("object does not contain field")
+	errInvalidType         = errors.New("invalid type")
 )
 
 // Logger logs error.
@@ -100,15 +109,14 @@ func (r *Response) ContainsJSONValues(values map[string]interface{}) {
 	if !r.unmarshalJSONBody() {
 		return
 	}
-	jq := jsonq.NewQuery(r.dataJSON)
-	for key, expected := range values {
-		val, err := jq.Interface(strings.Split(key, ".")...)
+	for query, expected := range values {
+		val, err := queryJSONData(query, r.dataJSON)
 		if err != nil {
-			r.logger.Errorf("missing JSON key: %q", key)
+			r.logger.Errorf("could not get value for query %q: %v", query, err)
 			continue
 		}
 		if !cmp.Equal(val, expected) {
-			r.logger.Errorf("wrong value for key %q (got %v; want %v)", key, val, expected)
+			r.logger.Errorf("wrong value for query %q (got %v; want %v)", query, val, expected)
 		}
 	}
 }
@@ -121,9 +129,45 @@ func (r *Response) unmarshalJSONBody() bool {
 		return false
 	}
 	if err := json.Unmarshal(r.body, &r.dataJSON); err != nil {
-		r.logger.Errorf("could not decode JSON response body: %v", err)
+		r.logger.Errorf("could not decode json response body: %v", err)
 		r.dataJSONError = true
 		return false
 	}
 	return true
+}
+
+// queryJSONData returns the value for the given query in the decoded json data.
+func queryJSONData(q string, v interface{}) (interface{}, error) {
+	var err error
+	ks := strings.Split(q, ".")
+	for i, k := range ks {
+		v, err = lookupJSONData(k, v)
+		if err != nil {
+			pq := strings.Join(ks[:i+1], ".")
+			return nil, fmt.Errorf("%s: %v", pq, err)
+		}
+	}
+	return v, nil
+}
+
+// lookupJSONData returns the value for the key in the decoded json data.
+func lookupJSONData(k string, i interface{}) (interface{}, error) {
+	switch v := i.(type) {
+	case []interface{}:
+		i, err := strconv.Atoi(k)
+		if err != nil {
+			return nil, errInvalidArrayIndex
+		}
+		if i >= len(v) {
+			return nil, errIndexOutOfBounds
+		}
+		return v[i], nil
+	case map[string]interface{}:
+		val, ok := v[k]
+		if !ok {
+			return nil, errObjectFieldNotFound
+		}
+		return val, nil
+	}
+	return nil, errInvalidType
 }
