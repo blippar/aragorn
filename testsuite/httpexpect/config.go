@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 type Config struct {
@@ -21,8 +22,11 @@ type Config struct {
 }
 
 type Base struct {
-	URL    string // Base URL prepended to all requests' path.
-	Header Header // Base set of headers added to all requests.
+	URL        string // Base URL prepended to all requests' path.
+	Header     Header // Base set of headers added to all requests.
+	OAUTH2     clientcredentials.Config
+	RetryCount int
+	RetryWait  int
 }
 
 type Test struct {

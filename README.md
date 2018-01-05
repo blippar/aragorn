@@ -84,10 +84,17 @@ An HTTP test suite contains a base configuration and list of tests.
 
 ##### HTTPBase
 
-| Name   | Type                | Required | Description                                                                                            |
-| ------ | ------------------- | :------: | ------------------------------------------------------------------------------------------------------ |
-| url    | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                 |
-| header | `map[string]string` |          | List of header to add to every test in this suite. Each test can overwrite a header set at this level. |
+| Name       | Type                | Required | Description                                                                                            |
+| ---------- | ------------------- | :------: | ------------------------------------------------------------------------------------------------------ |
+| url        | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                 |
+| header     | `map[string]string` |          | List of header to add to every test in this suite. Each test can overwrite a header set at this level. |
+| oauth2     | `OAUTH2Config`      |          | Describes a 2-legged OAuth2 flow                                                                       |
+| retryCount | `int`               |          | Number of time the HTTP request can be retry (default 1)                                               |
+| retryWait  | `int`               |          | Duration between each retry in second. (default 1s)                                                    |
+
+##### OAUTH2Config
+
+See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.org/golang.org/x/oauth2/clientcredentials#Config) for more info.
 
 ##### HTTPTest
 
@@ -184,6 +191,11 @@ every 12h:
       "url": "http://localhost:8080",
       "header": {
         "Accept-Encoding": "application/json"
+      },
+      "oauth2": {
+        "ClientID": "id",
+        "ClientSecret": "secret",
+        "TokenURL": "https://localhost:8080/token"
       }
     },
     "tests": [

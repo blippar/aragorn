@@ -1,6 +1,7 @@
 package httpexpect
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,8 +14,8 @@ import (
 )
 
 const (
-	defaultRetryCount = 3
-	defaultRetryWait  = 30 * time.Second
+	defaultRetryCount = 1
+	defaultRetryWait  = 1 * time.Second
 )
 
 // Suite describes an HTTP test suite.
@@ -48,12 +49,22 @@ func New(cfg *Config) (*Suite, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Suite{
+	s := &Suite{
 		tests:      tests,
 		client:     http.DefaultClient,
 		retryCount: defaultRetryCount,
 		retryWait:  defaultRetryWait,
-	}, nil
+	}
+	if cfg.Base.OAUTH2.ClientID != "" && cfg.Base.OAUTH2.ClientSecret != "" {
+		s.client = cfg.Base.OAUTH2.Client(context.Background())
+	}
+	if cfg.Base.RetryCount > 0 {
+		s.retryCount = cfg.Base.RetryCount
+	}
+	if cfg.Base.RetryWait > 0 {
+		s.retryWait = time.Duration(cfg.Base.RetryWait) * time.Second
+	}
+	return s, nil
 }
 
 // NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
@@ -84,7 +95,7 @@ func (s *Suite) runTestWithRetry(t *test, l Logger) {
 		if err == nil {
 			return
 		}
-		if attempt > s.retryCount {
+		if attempt >= s.retryCount {
 			l.Errorf("could not run test after %d attempts: %v", attempt, err)
 			return
 		}
