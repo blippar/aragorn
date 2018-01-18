@@ -78,60 +78,53 @@ func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
 }
 
 // Run runs all the tests in the suite.
-func (s *Suite) Run(r testsuite.Report) {
+func (s *Suite) Run(r testsuite.Report, failfast bool) {
 	for _, t := range s.tests {
 		tr := r.AddTest(t.name)
-		s.runTestWithRetry(t, tr)
+		err := s.runTestWithRetry(t)
+		if err != nil {
+			r.Log(err)
+		}
 		tr.Done()
+		if err != nil && failfast {
+			return
+		}
 	}
 }
 
 // runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
-func (s *Suite) runTestWithRetry(t *test, l Logger) {
+func (s *Suite) runTestWithRetry(t *test) error {
+	if s.retryCount == 1 {
+		_, err := s.runTest(t)
+		return err
+	}
 	for attempt := 1; ; attempt++ {
-		err := s.runTest(t, l)
-		if err == nil {
-			return
+		retry, err := s.runTest(t)
+		if !retry {
+			return err
 		}
 		if attempt >= s.retryCount {
-			l.Errorf("could not run test after %d attempts: %v", attempt, err)
-			return
+			return fmt.Errorf("could not run test after %d attempts: %v", attempt, err)
 		}
 		time.Sleep(s.retryWait * time.Duration(attempt))
 	}
 }
 
-func (s *Suite) runTest(t *test, l Logger) error {
+func (s *Suite) runTest(t *test) (bool, error) {
 	req := t.cloneRequest()
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("could not do HTTP request: %v", err)
+		return true, fmt.Errorf("could not do HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("could not read body: %v", err)
+		return true, fmt.Errorf("could not read body: %v", err)
 	}
-	r := NewResponse(l, resp, body)
-	r.StatusCode(t.statusCode)
-	r.ContainsHeader(t.header)
-	if t.document != nil {
-		raw, ok := t.document.([]byte)
-		if ok {
-			r.MatchRawDocument(raw)
-		} else {
-			r.MatchJSONDocument(t.document)
-		}
-	}
-	if t.jsonSchema != nil {
-		r.MatchJSONSchema(t.jsonSchema)
-	}
-	if t.jsonValues != nil {
-		r.ContainsJSONValues(t.jsonValues)
-	}
-	return nil
+	r := NewResponse(t, resp, body)
+	return false, r.Check()
 }
 
 // cloneRequest returns a clone of the provided *http.Request.

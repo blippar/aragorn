@@ -28,6 +28,7 @@ type Logger interface {
 
 // Response wraps an http.Response and allows you to have expectations on it.
 type Response struct {
+	test *test
 	resp   *http.Response
 	logger Logger
 
@@ -42,12 +43,33 @@ type Response struct {
 // NewResponse returns a new response on which you can have expectations.
 // Any failed expectation will be reported to the given reporter.
 // It reads and closes the response body.
-func NewResponse(logger Logger, resp *http.Response, body []byte) *Response {
+func NewResponse(test *test, resp *http.Response, body []byte) *Response {
 	return &Response{
-		logger: logger,
+		test: test,
 		resp:   resp,
 		body:   body,
 	}
+}
+
+func (r *Response) Check() error {
+	r.StatusCode(t.statusCode)
+	r.ContainsHeader(t.header)
+	if t.document != nil {
+		raw, ok := t.document.([]byte)
+		if ok {
+			r.MatchRawDocument(raw)
+		} else {
+			r.MatchJSONDocument(t.document)
+		}
+	}
+	if t.jsonSchema != nil {
+		r.MatchJSONSchema(t.jsonSchema)
+
+	}
+	if t.jsonValues != nil {
+		r.ContainsJSONValues(t.jsonValues)
+	}
+	return nil
 }
 
 // StatusCode checks whether the response has the given status code.

@@ -5,7 +5,7 @@ import (
 )
 
 type Suite interface {
-	Run(Report)
+	Run(report Report, failfast bool)
 }
 
 type Report interface {

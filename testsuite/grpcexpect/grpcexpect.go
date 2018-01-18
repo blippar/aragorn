@@ -21,7 +21,7 @@ func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
 }
 
 // Run runs all the tests in the suite.
-func (s *Suite) Run(r testsuite.Report) {
+func (s *Suite) Run(r testsuite.Report, failfast bool) {
 	log.Error("not implemented")
 }
 

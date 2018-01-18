@@ -22,21 +22,24 @@ var (
 )
 
 type Server struct {
-	dirs []string
-	fsw  *fsnotify.Watcher
-	sch  *scheduler.Scheduler
+	dirs     []string
+	failfast bool
+
+	fsw *fsnotify.Watcher
+	sch *scheduler.Scheduler
 
 	doneCh chan struct{}
 	stopCh chan struct{}
 }
 
-func New(dirs []string) *Server {
+func New(dirs []string, failfast bool) *Server {
 	if len(dirs) == 0 {
 		dirs = []string{"."}
 	}
 	return &Server{
-		dirs: dirs,
-		sch:  scheduler.New(),
+		dirs:     dirs,
+		failfast: failfast,
+		sch:      scheduler.New(),
 	}
 }
 
