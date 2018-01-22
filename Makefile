@@ -18,7 +18,6 @@ DOCKOPTS  += --build-arg VERSION="$(VERSION)"
 # If run as 'make VERBOSE=true', it will pass th '-v' option to GOBIN
 ifeq ($(VERBOSE),true)
 GOOPT     += -v
-FPMFLAGS  += --verbose
 else
 DOCKOPTS  += -q
 endif

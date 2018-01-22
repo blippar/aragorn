@@ -24,6 +24,7 @@ type Suite struct {
 	typ      string
 	runCron  string
 	runEvery time.Duration
+	failfast bool
 }
 
 type SuiteConfig struct {
@@ -46,7 +47,7 @@ type SuiteConfig struct {
 	Suite json.RawMessage
 }
 
-func NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
+func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 	var cfg SuiteConfig
 	if err := json.NewDecoder(r).Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("could not decode test suite file: %v", err)
@@ -80,22 +81,23 @@ func NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 		typ:      cfg.Type,
 		runCron:  cfg.RunCron,
 		runEvery: runEvery,
+		failfast: s.failfast,
 	}, nil
 }
 
-func NewSuiteFromFile(path string) (*Suite, error) {
+func (s *Server) NewSuiteFromFile(path string) (*Suite, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open test suite file: %v", err)
 	}
 	defer f.Close()
 	dir := filepath.Dir(path)
-	return NewSuiteFromReader(dir, f)
+	return s.NewSuiteFromReader(dir, f)
 }
 
 func (s *Suite) Run() {
 	report := notifier.NewReport(s.name)
-	s.suite.Run(report)
+	s.suite.Run(report, s.failfast)
 	report.Done()
 	s.notifier.Notify(report)
 }

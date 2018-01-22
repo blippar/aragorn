@@ -32,7 +32,7 @@ type Base struct {
 type Test struct {
 	Name    string  // Name used to identify this test.
 	Request Request // Request describes the HTTP request.
-	Expect  Expect  // Expect describes the result of the HTTP request.
+	Expect  Expect  // Expect describes the expected result of the HTTP request.
 }
 
 type Request struct {
@@ -65,7 +65,7 @@ func (h Header) addToRequest(req *http.Request) {
 	}
 }
 
-// prepare verifies that an HTTP test suite is valid. It also create the HTTP requests,
+// genTest verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
 func (cfg *Config) genTests() ([]*test, error) {
 	if cfg.Base.URL == "" {
@@ -113,7 +113,7 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 		set++
 	}
 	if set > 1 {
-		errs = append(errs, "- request: at most one of body, multipart or formURLEncoded can be set at once")
+		errs = append(errs, "- request: at most one of body, multipart or formData can be set at once")
 	}
 
 	if httpReq, err := t.Request.toHTTPRequest(cfg); err != nil {

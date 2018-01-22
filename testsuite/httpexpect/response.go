@@ -28,7 +28,7 @@ type Logger interface {
 
 // Response wraps an http.Response and allows you to have expectations on it.
 type Response struct {
-	test *test
+	test   *test
 	resp   *http.Response
 	logger Logger
 
@@ -38,6 +38,7 @@ type Response struct {
 
 	dataJSON      interface{}
 	dataJSONError bool
+	errs          []string
 }
 
 // NewResponse returns a new response on which you can have expectations.
@@ -46,42 +47,44 @@ type Response struct {
 func NewResponse(test *test, resp *http.Response, body []byte) *Response {
 	return &Response{
 		test: test,
-		resp:   resp,
-		body:   body,
+		resp: resp,
+		body: body,
 	}
 }
 
 func (r *Response) Check() error {
-	r.StatusCode(t.statusCode)
-	r.ContainsHeader(t.header)
-	if t.document != nil {
-		raw, ok := t.document.([]byte)
+	r.StatusCode()
+	r.ContainsHeader()
+	if doc := r.test.document; doc != nil {
+		raw, ok := doc.([]byte)
 		if ok {
 			r.MatchRawDocument(raw)
 		} else {
-			r.MatchJSONDocument(t.document)
+			r.MatchJSONDocument(doc)
 		}
 	}
-	if t.jsonSchema != nil {
-		r.MatchJSONSchema(t.jsonSchema)
-
+	if r.test.jsonSchema != nil {
+		r.MatchJSONSchema()
 	}
-	if t.jsonValues != nil {
-		r.ContainsJSONValues(t.jsonValues)
+	if r.test.jsonValues != nil {
+		r.ContainsJSONValues()
+	}
+	if len(r.errs) > 0 {
+		return errors.New(strings.Join(r.errs, "\n"))
 	}
 	return nil
 }
 
 // StatusCode checks whether the response has the given status code.
-func (r *Response) StatusCode(code int) {
-	if r.resp.StatusCode != code {
-		r.logger.Errorf("wrong http status code (got %d; expected %d)", r.resp.StatusCode, code)
+func (r *Response) StatusCode() {
+	if r.resp.StatusCode != r.test.statusCode {
+		r.logger.Errorf("wrong http status code (got %d; expected %d)", r.resp.StatusCode, r.test.statusCode)
 	}
 }
 
 // ContainsHeader checks whether the response contains the given headers.
-func (r *Response) ContainsHeader(h Header) {
-	for k, v := range h {
+func (r *Response) ContainsHeader() {
+	for k, v := range r.test.header {
 		if val := r.resp.Header.Get(k); val == "" {
 			r.logger.Errorf("missing header %s", k)
 		} else if val != v {
@@ -108,12 +111,12 @@ func (r *Response) MatchJSONDocument(doc interface{}) {
 }
 
 // MatchJSONSchema checks whether the JSON formated response body matches the given JSON schema.
-func (r *Response) MatchJSONSchema(schema *gojsonschema.Schema) {
+func (r *Response) MatchJSONSchema() {
 	if !r.unmarshalJSONBody() {
 		return
 	}
 	data := gojsonschema.NewGoLoader(r.dataJSON)
-	result, err := schema.Validate(data)
+	result, err := r.test.jsonSchema.Validate(data)
 	if err != nil {
 		r.logger.Errorf("JSON schema validation failed: %v", err)
 		return
@@ -127,11 +130,11 @@ func (r *Response) MatchJSONSchema(schema *gojsonschema.Schema) {
 
 // ContainsJSONValues checks that the JSON formated response body contains
 // specific values at given keys.
-func (r *Response) ContainsJSONValues(values map[string]interface{}) {
+func (r *Response) ContainsJSONValues() {
 	if !r.unmarshalJSONBody() {
 		return
 	}
-	for query, expected := range values {
+	for query, expected := range r.test.jsonValues {
 		val, err := queryJSONData(query, r.dataJSON)
 		if err != nil {
 			r.logger.Errorf("could not get value for query %q: %v", query, err)

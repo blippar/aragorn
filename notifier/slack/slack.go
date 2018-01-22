@@ -19,28 +19,28 @@ const (
 )
 
 type notification struct {
-	Channel     string       `json:"channel"`
-	IconEmoji   string       `json:"icon_emoji"`
-	Username    string       `json:"username"`
-	Text        string       `json:"text"`
-	Attachments []attachment `json:"attachments"`
+	Channel     string       `json:"channel,omitempty"`
+	IconEmoji   string       `json:"icon_emoji,omitempty"`
+	Username    string       `json:"username,omitempty"`
+	Text        string       `json:"text,omitempty"`
+	Attachments []attachment `json:"attachments,omitempty"`
 }
 
 type attachment struct {
-	Color    string            `json:"color"`
-	Fallback string            `json:"fallback"`
-	ImageURL string            `json:"image_url"`
-	Text     string            `json:"text"`
-	Title    string            `json:"title"`
-	ThumbURL string            `json:"thumb_url"`
-	MrkdwnIn []string          `json:"mrkdwn_in"`
-	Fields   []attachmentField `json:"fields"`
+	Color    string            `json:"color,omitempty"`
+	Fallback string            `json:"fallback,omitempty"`
+	ImageURL string            `json:"image_url,omitempty"`
+	Text     string            `json:"text,omitempty"`
+	Title    string            `json:"title,omitempty"`
+	ThumbURL string            `json:"thumb_url,omitempty"`
+	MrkdwnIn []string          `json:"mrkdwn_in,omitempty"`
+	Fields   []attachmentField `json:"fields,omitempty"`
 }
 
 type attachmentField struct {
-	Short bool   `json:"short"`
-	Title string `json:"title"`
-	Value string `json:"value"`
+	Short bool   `json:"short,omitempty"`
+	Title string `json:"title,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 // SlackNotifier is a reporter that stacks errors for later use.

@@ -83,7 +83,7 @@ func (s *Suite) Run(r testsuite.Report, failfast bool) {
 		tr := r.AddTest(t.name)
 		err := s.runTestWithRetry(t)
 		if err != nil {
-			r.Log(err)
+			tr.Error(err)
 		}
 		tr.Done()
 		if err != nil && failfast {
