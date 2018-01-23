@@ -29,8 +29,8 @@ type Logger interface {
 // Response wraps an http.Response and allows you to have expectations on it.
 type Response struct {
 	test   *test
-	resp   *http.Response
 	logger Logger
+	resp   *http.Response
 
 	// HTTP response body, this is required because some
 	// verifications need to read the body multiple times.
@@ -38,21 +38,22 @@ type Response struct {
 
 	dataJSON      interface{}
 	dataJSONError bool
-	errs          []string
+	errBuf        *bytes.Buffer
 }
 
 // NewResponse returns a new response on which you can have expectations.
 // Any failed expectation will be reported to the given reporter.
 // It reads and closes the response body.
-func NewResponse(test *test, resp *http.Response, body []byte) *Response {
+func NewResponse(test *test, logger Logger, resp *http.Response, body []byte) *Response {
 	return &Response{
-		test: test,
-		resp: resp,
-		body: body,
+		test:   test,
+		logger: logger,
+		resp:   resp,
+		body:   body,
 	}
 }
 
-func (r *Response) Check() error {
+func (r *Response) Check() {
 	r.StatusCode()
 	r.ContainsHeader()
 	if doc := r.test.document; doc != nil {
@@ -69,10 +70,6 @@ func (r *Response) Check() error {
 	if r.test.jsonValues != nil {
 		r.ContainsJSONValues()
 	}
-	if len(r.errs) > 0 {
-		return errors.New(strings.Join(r.errs, "\n"))
-	}
-	return nil
 }
 
 // StatusCode checks whether the response has the given status code.

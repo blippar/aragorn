@@ -20,7 +20,6 @@ type Suite struct {
 	name     string
 	suite    testsuite.Suite
 	notifier notifier.Notifier
-
 	typ      string
 	runCron  string
 	runEvery time.Duration
@@ -39,6 +38,8 @@ type SuiteConfig struct {
 		Username string
 		Channel  string
 	}
+
+	FailFast bool // stop after first test failure
 
 	// Type of the test suite, can be HTTP or GRPC.
 	Type string
@@ -81,7 +82,7 @@ func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 		typ:      cfg.Type,
 		runCron:  cfg.RunCron,
 		runEvery: runEvery,
-		failfast: s.failfast,
+		failfast: s.failfast || cfg.FailFast,
 	}, nil
 }
 
@@ -96,8 +97,8 @@ func (s *Server) NewSuiteFromFile(path string) (*Suite, error) {
 }
 
 func (s *Suite) Run() {
-	report := notifier.NewReport(s.name)
-	s.suite.Run(report, s.failfast)
+	report := notifier.NewReport(s.name, s.failfast)
+	s.suite.Run(report)
 	report.Done()
 	s.notifier.Notify(report)
 }
