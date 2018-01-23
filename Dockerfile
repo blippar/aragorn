@@ -2,13 +2,13 @@ FROM golang:alpine AS builder
 
 RUN apk add --no-cache make
 
-ARG VERSION="unknown"
-ENV ARAGORN_VERSION="$VERSION"
+ARG VERSION
+ARG COMMIT_HASH
 
 COPY .  /go/src/github.com/blippar/aragorn
 WORKDIR /go/src/github.com/blippar/aragorn
 
-RUN make VERSION="${ARAGORN_VERSION}" static
+RUN make VERSION="${VERSION}" COMMIT_HASH="${COMMIT_HASH}" static
 
 FROM alpine:latest AS runtime
 
