@@ -20,10 +20,10 @@ type Suite struct {
 	name     string
 	suite    testsuite.Suite
 	notifier notifier.Notifier
-
 	typ      string
 	runCron  string
 	runEvery time.Duration
+	failfast bool
 }
 
 type SuiteConfig struct {
@@ -39,6 +39,8 @@ type SuiteConfig struct {
 		Channel  string
 	}
 
+	FailFast bool // stop after first test failure
+
 	// Type of the test suite, can be HTTP or GRPC.
 	Type string
 
@@ -46,7 +48,7 @@ type SuiteConfig struct {
 	Suite json.RawMessage
 }
 
-func NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
+func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 	var cfg SuiteConfig
 	if err := json.NewDecoder(r).Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("could not decode test suite file: %v", err)
@@ -80,21 +82,22 @@ func NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 		typ:      cfg.Type,
 		runCron:  cfg.RunCron,
 		runEvery: runEvery,
+		failfast: s.failfast || cfg.FailFast,
 	}, nil
 }
 
-func NewSuiteFromFile(path string) (*Suite, error) {
+func (s *Server) NewSuiteFromFile(path string) (*Suite, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open test suite file: %v", err)
 	}
 	defer f.Close()
 	dir := filepath.Dir(path)
-	return NewSuiteFromReader(dir, f)
+	return s.NewSuiteFromReader(dir, f)
 }
 
 func (s *Suite) Run() {
-	report := notifier.NewReport(s.name)
+	report := notifier.NewReport(s.name, s.failfast)
 	s.suite.Run(report)
 	report.Done()
 	s.notifier.Notify(report)

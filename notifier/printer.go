@@ -24,17 +24,18 @@ func (*printer) Notify(r *Report) {
 			zap.Time("started_at", tr.Start),
 			zap.Duration("duration", tr.Duration),
 		}
-		msg := "test passed"
 		if len(tr.Errs) > 0 {
-			msg = "test failed"
 			fields = append(fields, zap.Errors("errs", tr.Errs))
+			log.Warn("test failed", fields...)
+		} else {
+			log.Info("test passed", fields...)
 		}
-		log.Info(msg, fields...)
 	}
 	log.Info("test suite done",
 		zap.String("suite", r.Name),
 		zap.Time("started_at", r.Start),
 		zap.Duration("duration", r.Duration),
 		zap.Int("nb_tests", len(r.Tests)),
+		zap.Bool("failfast", r.failfast),
 	)
 }

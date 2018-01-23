@@ -12,7 +12,9 @@ import (
 
 const runHelp = `Monitor and schedule the test suites in the directories`
 
-type runCommand struct{}
+type runCommand struct {
+	failfast bool
+}
 
 func (*runCommand) Name() string { return "run" }
 func (*runCommand) Args() string {
@@ -22,10 +24,12 @@ func (*runCommand) ShortHelp() string { return runHelp }
 func (*runCommand) LongHelp() string  { return runHelp }
 func (*runCommand) Hidden() bool      { return false }
 
-func (*runCommand) Register(fs *flag.FlagSet) {}
+func (cmd *runCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.failfast, "failfast", false, "stop after first test failure")
+}
 
-func (*runCommand) Run(args []string) error {
-	srv := server.New(args)
+func (cmd *runCommand) Run(args []string) error {
+	srv := server.New(args, cmd.failfast)
 	if err := srv.Start(); err != nil {
 		return fmt.Errorf("could not start service: %v", err)
 	}

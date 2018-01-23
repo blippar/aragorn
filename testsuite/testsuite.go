@@ -5,7 +5,7 @@ import (
 )
 
 type Suite interface {
-	Run(Report)
+	Run(report Report)
 }
 
 type Report interface {
@@ -15,7 +15,7 @@ type Report interface {
 type TestReport interface {
 	Error(args ...interface{})
 	Errorf(format string, args ...interface{})
-	Done()
+	Done() bool
 }
 
 type RegisterFunc func(path string, data []byte) (Suite, error)

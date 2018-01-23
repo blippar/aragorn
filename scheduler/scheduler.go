@@ -69,7 +69,7 @@ func (s *Scheduler) Add(name string, j Job, interval time.Duration) error {
 	return nil
 }
 
-// AddCron adds the job in the scheduler. The job will be run depending of the cron expression
+// AddCron adds the job in the scheduler. The job will be run depending on the cron expression
 // when the scheduler is started or already running.
 func (s *Scheduler) AddCron(name string, j Job, expr string) error {
 	s.mu.Lock()

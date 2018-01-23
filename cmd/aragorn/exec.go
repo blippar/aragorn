@@ -8,7 +8,9 @@ import (
 
 const execHelp = `Execute the test suites in the directories`
 
-type execCommand struct{}
+type execCommand struct {
+	failfast bool
+}
 
 func (*execCommand) Name() string { return "exec" }
 func (*execCommand) Args() string {
@@ -18,8 +20,10 @@ func (*execCommand) ShortHelp() string { return execHelp }
 func (*execCommand) LongHelp() string  { return execHelp }
 func (*execCommand) Hidden() bool      { return false }
 
-func (*execCommand) Register(fs *flag.FlagSet) {}
+func (cmd *execCommand) Register(fs *flag.FlagSet) {
+	fs.BoolVar(&cmd.failfast, "failfast", false, "stop after first test failure")
+}
 
-func (*execCommand) Run(args []string) error {
-	return server.New(args).Exec()
+func (cmd *execCommand) Run(args []string) error {
+	return server.New(args, cmd.failfast).Exec()
 }

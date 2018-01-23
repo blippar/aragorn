@@ -1,7 +1,7 @@
 # Default config
 VERBOSE     ?= false
 VERSION     ?= $(shell echo `git describe --tags --dirty  2>/dev/null || echo devel`)
-COMMIT_HASH = $(shell echo `git rev-parse --short HEAD 2>/dev/null`)
+COMMIT_HASH ?= $(shell echo `git rev-parse --short HEAD 2>/dev/null`)
 DATE        = $(shell echo `date "+%Y-%m-%d"`)
 
 # Go configuration
@@ -13,12 +13,11 @@ GOLDF      = -s -w -X main.commitHash=$(COMMIT_HASH) -X main.buildDate=$(DATE) -
 # Docker configuration
 DOCKBIN   := $(shell which docker)
 DOCKIMG   := blippar/aragorn
-DOCKOPTS  += --build-arg VERSION="$(VERSION)"
+DOCKOPTS  += --build-arg VERSION="$(VERSION)" --build-arg COMMIT_HASH="$(COMMIT_HASH)"
 
-# If run as 'make VERBOSE=true', it will pass th '-v' option to GOBIN
+# If run as 'make VERBOSE=true', it will pass the '-v' option to GOBIN
 ifeq ($(VERBOSE),true)
 GOOPT     += -v
-FPMFLAGS  += --verbose
 else
 DOCKOPTS  += -q
 endif

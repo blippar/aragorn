@@ -22,21 +22,24 @@ var (
 )
 
 type Server struct {
-	dirs []string
-	fsw  *fsnotify.Watcher
-	sch  *scheduler.Scheduler
+	dirs     []string
+	failfast bool
+
+	fsw *fsnotify.Watcher
+	sch *scheduler.Scheduler
 
 	doneCh chan struct{}
 	stopCh chan struct{}
 }
 
-func New(dirs []string) *Server {
+func New(dirs []string, failfast bool) *Server {
 	if len(dirs) == 0 {
 		dirs = []string{"."}
 	}
 	return &Server{
-		dirs: dirs,
-		sch:  scheduler.New(),
+		dirs:     dirs,
+		failfast: failfast,
+		sch:      scheduler.New(),
 	}
 }
 
@@ -44,7 +47,7 @@ func (s *Server) Start() error {
 	s.doneCh = make(chan struct{})
 	s.stopCh = make(chan struct{})
 
-	if err := s.loadDirs(); err != nil {
+	if err := s.processTestSuites(true, false); err != nil {
 		return err
 	}
 
@@ -71,30 +74,14 @@ func (s *Server) Wait() <-chan struct{} {
 }
 
 func (s *Server) List() error {
-	walkFn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
-			return nil
-		}
-		suite, err := NewSuiteFromFile(path)
-		if err != nil {
-			log.Error("could not create test suite", zap.String("file", path), zap.Error(err))
-			return nil
-		}
-		log.Info("test suite", zap.String("file", path), zap.String("suite", suite.name), zap.String("type", suite.typ))
-		return nil
-	}
-	for _, dir := range s.dirs {
-		if err := filepath.Walk(dir, walkFn); err != nil {
-			return fmt.Errorf("could not walk %q directory: %v", dir, err)
-		}
-	}
-	return nil
+	return s.processTestSuites(false, false)
 }
 
 func (s *Server) Exec() error {
+	return s.processTestSuites(false, true)
+}
+
+func (s *Server) processTestSuites(schedule, exec bool) error {
 	walkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -102,13 +89,7 @@ func (s *Server) Exec() error {
 		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
 			return nil
 		}
-		suite, err := NewSuiteFromFile(path)
-		if err != nil {
-			log.Error("could not create test suite", zap.String("file", path), zap.Error(err))
-			return nil
-		}
-		log.Info("test suite starting", zap.String("file", path), zap.String("suite", suite.name))
-		suite.Run()
+		s.addSuite(path, schedule, exec)
 		return nil
 	}
 	for _, dir := range s.dirs {
@@ -119,42 +100,30 @@ func (s *Server) Exec() error {
 	return nil
 }
 
-func (s *Server) loadDirs() error {
-	walkFn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
-			return nil
-		}
-		if err := s.addTestSuite(path); err != nil {
-			log.Error("could not add test suite", zap.String("file", path), zap.Error(err))
-			return nil
-		}
-		log.Info("test suite added", zap.String("file", path))
-		return nil
-	}
-	log.Info("looking for existing test suite files in directories", zap.Strings("directories", s.dirs))
-	for _, dir := range s.dirs {
-		if err := filepath.Walk(dir, walkFn); err != nil {
-			return fmt.Errorf("could not walk %q directory: %v", dir, err)
-		}
-	}
-	return nil
-}
-
-func (s *Server) addTestSuite(path string) error {
-	suite, err := NewSuiteFromFile(path)
+func (s *Server) addSuite(path string, schedule, exec bool) {
+	suite, err := s.NewSuiteFromFile(path)
 	if err != nil {
-		return err
+		log.Error("test suite create", zap.String("file", path), zap.Error(err))
+		return
 	}
+	log.Info("test suite", zap.String("file", path), zap.String("suite", suite.name), zap.String("type", suite.typ))
+	if schedule {
+		if err := s.scheduleSuite(path, suite); err != nil {
+			log.Error("test suite scheduling", zap.String("file", path), zap.Error(err))
+		}
+	} else if exec {
+		suite.Run()
+	}
+}
+
+func (s *Server) scheduleSuite(path string, suite *Suite) error {
 	if suite.runCron != "" {
 		return s.sch.AddCron(path, suite, suite.runCron)
 	}
 	return s.sch.Add(path, suite, suite.runEvery)
 }
 
-func (s *Server) removeTestSuite(path string) error {
+func (s *Server) removeSuite(path string) error {
 	return s.sch.Remove(path)
 }
 
@@ -207,27 +176,19 @@ func (s *Server) fsWatchEventLoop() error {
 func (s *Server) fsHandleTestSuiteFileEvent(e fsnotify.Event) {
 	switch {
 	case isCreateEvent(e.Op):
-		if err := s.addTestSuite(e.Name); err != nil {
-			log.Error("could not add test suite", zap.String("file", e.Name), zap.Error(err))
-			return
-		}
-		log.Info("test suite added", zap.String("file", e.Name))
+		s.addSuite(e.Name, true, false)
 	case isRenameEvent(e.Op) || isRemoveEvent(e.Op):
-		if err := s.removeTestSuite(e.Name); err != nil {
+		if err := s.removeSuite(e.Name); err != nil {
 			log.Error("could not remove test suite", zap.String("file", e.Name), zap.Error(err))
 			return
 		}
 		log.Info("test suite removed", zap.String("file", e.Name))
 	case isWriteEvent(e.Op):
-		if err := s.removeTestSuite(e.Name); err != nil {
+		if err := s.removeSuite(e.Name); err != nil {
 			log.Error("could not remove test suite", zap.String("file", e.Name), zap.Error(err))
 			return
 		}
-		if err := s.addTestSuite(e.Name); err != nil {
-			log.Error("could not create test suite from disk", zap.String("file", e.Name), zap.Error(err))
-			return
-		}
-		log.Info("test suite updated", zap.String("file", e.Name))
+		s.addSuite(e.Name, true, false)
 	}
 }
 

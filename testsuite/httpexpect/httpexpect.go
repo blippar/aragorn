@@ -82,7 +82,9 @@ func (s *Suite) Run(r testsuite.Report) {
 	for _, t := range s.tests {
 		tr := r.AddTest(t.name)
 		s.runTestWithRetry(t, tr)
-		tr.Done()
+		if tr.Done() {
+			return
+		}
 	}
 }
 
@@ -90,6 +92,12 @@ func (s *Suite) Run(r testsuite.Report) {
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
 func (s *Suite) runTestWithRetry(t *test, l Logger) {
+	if s.retryCount == 1 {
+		if err := s.runTest(t, l); err != nil {
+			l.Error(err)
+		}
+		return
+	}
 	for attempt := 1; ; attempt++ {
 		err := s.runTest(t, l)
 		if err == nil {
@@ -114,23 +122,7 @@ func (s *Suite) runTest(t *test, l Logger) error {
 	if err != nil {
 		return fmt.Errorf("could not read body: %v", err)
 	}
-	r := NewResponse(l, resp, body)
-	r.StatusCode(t.statusCode)
-	r.ContainsHeader(t.header)
-	if t.document != nil {
-		raw, ok := t.document.([]byte)
-		if ok {
-			r.MatchRawDocument(raw)
-		} else {
-			r.MatchJSONDocument(t.document)
-		}
-	}
-	if t.jsonSchema != nil {
-		r.MatchJSONSchema(t.jsonSchema)
-	}
-	if t.jsonValues != nil {
-		r.ContainsJSONValues(t.jsonValues)
-	}
+	checkResponse(t, l, resp, body)
 	return nil
 }
 
