@@ -43,7 +43,7 @@ The directories to watch can be specified via command line positional arguments
 #### SuiteConfig
 
 A test suite describes a combination of tests to be run. It is composed of some
-configuration fields for the scheduling and notification handling. The tests are describe in the suite field depending on the type field (`HTTP` or `GRPC`).
+configuration fields for the scheduling and notification handling. The tests are described in the suite field depending on the type field (`HTTP` or `GRPC`).
 
 | Name           | Type                       | Required | Description                                                                                                                           |
 | -------------- | -------------------------- | :------: | ------------------------------------------------------------------------------------------------------------------------------------- |
