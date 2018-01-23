@@ -122,8 +122,7 @@ func (s *Suite) runTest(t *test, l Logger) error {
 	if err != nil {
 		return fmt.Errorf("could not read body: %v", err)
 	}
-	r := NewResponse(t, l, resp, body)
-	r.Check()
+	checkResponse(t, l, resp, body)
 	return nil
 }
 
