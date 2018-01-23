@@ -5,7 +5,7 @@
 Aragorn is a regression testing tool that can run a set of tests (test suites)
 periodically. It acts as a server that watches for changes a list of
 directories. When a file describing a test suite (a JSON file with the
-.suite.json extension, see example below for more information) is added to one
+`.suite.json` extension, see example below for more information) is added to one
 of the watched directories, it is analysed, prepared and scheduled to be run
 based on its own configuration. If a file is deleted, it will remove this test
 suite from the scheduler and it will not be run anymore. If a file is modified,
@@ -27,24 +27,23 @@ are 3 possible outcomes:
 Where the failures/errors are reported and how they are reported depends on the
 notifier configured. For now the only one implemented is the SlackNotifier. It
 is set at the initialization of a test suite. During a test suite execution, it
-stacks every potential failure and/or error. At then end of the exectution of
-the suite, it will send a notification describing what happened if there was any
+stacks every potential failure and/or error. At the end of the suite execution,
+it will send a notification describing what happened if there was any
 failure or error. If everything ran without any issue, no notification is sent.
 
 ## Quick Start
 
 The directories to watch can be specified via command line positional arguments
-: `./aragorn dir1 dir2`.
-
-You can humanize the log output with `-humanize`.
+: `./aragorn run dir1 dir2`.
 
 ## Test Suites
 
 ### Creating a test suite
 
+#### SuiteConfig
+
 A test suite describes a combination of tests to be run. It is composed of some
-configuration fields and of the test suite itself, that depends on the type set
-(`HTTP` or `GRPC`).
+configuration fields for the scheduling and notification handling. The tests are describe in the suite field depending on the type field (`HTTP` or `GRPC`).
 
 | Name           | Type                       | Required | Description                                                                                                                           |
 | -------------- | -------------------------- | :------: | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -77,20 +76,20 @@ Example :
 
 An HTTP test suite contains a base configuration and list of tests.
 
-| Name  | Type         | Required | Description                                                                                      |
-| ----- | ------------ | :------: | ------------------------------------------------------------------------------------------------ |
-| base  | `HTTPBase`   |    ✔️    | Base description of the tests in this suite like base URL or HTTP header to add too all requests |
-| tests | `[]HTTPTest` |    ✔️    | List of tests to run.                                                                            |
+| Name  | Type         | Required | Description                                 |
+| ----- | ------------ | :------: | ------------------------------------------- |
+| base  | `HTTPBase`   |    ✔️    | Base description of the tests in this suite |
+| tests | `[]HTTPTest` |    ✔️    | List of tests to run.                       |
 
 ##### HTTPBase
 
-| Name       | Type                | Required | Description                                                                                            |
-| ---------- | ------------------- | :------: | ------------------------------------------------------------------------------------------------------ |
-| url        | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                 |
-| header     | `map[string]string` |          | List of header to add to every test in this suite. Each test can overwrite a header set at this level. |
-| oauth2     | `OAUTH2Config`      |          | Describes a 2-legged OAuth2 flow                                                                       |
-| retryCount | `int`               |          | Number of time the HTTP request can be retry (default 1)                                               |
-| retryWait  | `int`               |          | Duration between each retry in second. (default 1s)                                                    |
+| Name       | Type                | Required | Description                                                                                                                    |
+| ---------- | ------------------- | :------: | ------------------------------------------------------------------------------------------------------------------------------ |
+| url        | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                                         |
+| header     | `map[string]string` |          | List of request header fields to add to every test in this suite. Each test can overwrite the header fields set at this level. |
+| oauth2     | `OAUTH2Config`      |          | Describes a 2-legged OAuth2 flow.                                                                                              |
+| retryCount | `int`               |          | Number of time the HTTP request can be retry. (default 1)                                                                      |
+| retryWait  | `int`               |          | Duration between each retry in second. (default 1s)                                                                            |
 
 ##### OAUTH2Config
 
@@ -110,7 +109,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | --------- | ------------------- | :------: | ----------------------------------------------------------------------- |
 | path      | `string`            |          | Path appended to the base `url` set in the `HTTPBase`. Defaults to `/`. |
 | method    | `string`            |          | HTTP method of the request. Defaults to `GET`.                          |
-| header    | `map[string]string` |          | Key-value pairs in the HTTP header of the request.                      |
+| header    | `map[string]string` |          | List of request header fields.                                          |
 | multipart | `map[string]string` |          | Multipart content of the request. Values started with a `@` are files.  |
 | formData  | `map[string]string` |          | Form data as application/x-url-encoded format.                          |
 | body      | `Document`          |          | Request body.                                                           |
