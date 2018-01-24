@@ -163,15 +163,13 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 		}
 	}
 
-	if test.req != nil {
-		_, isRawDoc := test.document.([]byte)
-		if test.req.Header.Get("Accept") == "" && (test.jsonSchema != nil || test.jsonValues != nil || (test.document != nil && !isRawDoc)) {
-			test.req.Header.Set("Accept", "application/json")
-		}
-	}
-
 	if err := concatErrors(errs); err != nil {
 		return nil, err
+	}
+
+	_, isRawDoc := test.document.([]byte)
+	if test.req.Header.Get("Accept") == "" && (test.jsonSchema != nil || test.jsonValues != nil || (test.document != nil && !isRawDoc)) {
+		test.req.Header.Set("Accept", "application/json")
 	}
 	return test, nil
 }

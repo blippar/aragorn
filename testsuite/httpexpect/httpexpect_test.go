@@ -244,7 +244,7 @@ func TestGetObjectField(t *testing.T) {
 
 func TestNewWithEmptyConfig(t *testing.T) {
 	if _, err := New(&Config{}); err == nil {
-		t.Errorf("new test suite with empty config should fail")
+		t.Error("new test suite with empty config should return an error")
 	}
 }
 
@@ -262,7 +262,7 @@ func TestNewWithInvalidRequestConfig(t *testing.T) {
 			},
 		},
 	}); err == nil {
-		t.Errorf("new test suite with invalid request should fail: %v", err)
+		t.Error("new test suite with invalid request should return an error")
 	}
 }
 
