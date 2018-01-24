@@ -254,6 +254,8 @@ func TestJsonSchemaTestSuite(t *testing.T) {
 		{"phase": "root pointer ref", "test": "recursive match", "schema": "ref/schema_0.json", "data": "ref/data_01.json", "valid": "true"},
 		{"phase": "root pointer ref", "test": "mismatch", "schema": "ref/schema_0.json", "data": "ref/data_02.json", "valid": "false", "errors": "additional_property_not_allowed"},
 		{"phase": "root pointer ref", "test": "recursive mismatch", "schema": "ref/schema_0.json", "data": "ref/data_03.json", "valid": "false", "errors": "additional_property_not_allowed"},
+		{"phase": "loader pointer ref", "test": "root ref valid", "schema": "ref/schema_6.json#/definitions/x", "data": "ref/data_40.json", "valid": "true"},
+		{"phase": "loader pointer ref", "test": "root ref invalid", "schema": "ref/schema_6.json#/definitions/x", "data": "ref/data_41.json", "valid": "false", "errors": "invalid_type"},
 		{"phase": "relative pointer ref to object", "test": "match", "schema": "ref/schema_1.json", "data": "ref/data_10.json", "valid": "true"},
 		{"phase": "relative pointer ref to object", "test": "mismatch", "schema": "ref/schema_1.json", "data": "ref/data_11.json", "valid": "false", "errors": "invalid_type"},
 		{"phase": "relative pointer ref to array", "test": "match array", "schema": "ref/schema_2.json", "data": "ref/data_20.json", "valid": "true"},
@@ -360,11 +362,9 @@ func TestJsonSchemaTestSuite(t *testing.T) {
 		{"phase": "format validation", "test": "uri format is invalid", "schema": "format/schema_6.json", "data": "format/data_13.json", "valid": "false", "errors": "format"},
 		{"phase": "format validation", "test": "number format is valid", "schema": "format/schema_7.json", "data": "format/data_29.json", "valid": "true"},
 		{"phase": "format validation", "test": "number format is valid", "schema": "format/schema_7.json", "data": "format/data_30.json", "valid": "false", "errors": "format"},
+		{"phase": "change resolution scope", "test": "changed scope ref valid", "schema": "refRemote/schema_3.json", "data": "refRemote/data_30.json", "valid": "true"},
+		{"phase": "change resolution scope", "test": "changed scope ref invalid", "schema": "refRemote/schema_3.json", "data": "refRemote/data_31.json", "valid": "false", "errors": "invalid_type"},
 	}
-
-	//TODO Pass failed tests : id(s) as scope for references is not implemented yet
-	//map[string]string{"phase": "change resolution scope", "test": "changed scope ref valid", "schema": "refRemote/schema_3.json", "data": "refRemote/data_30.json", "valid": "true"},
-	//map[string]string{"phase": "change resolution scope", "test": "changed scope ref invalid", "schema": "refRemote/schema_3.json", "data": "refRemote/data_31.json", "valid": "false"}}
 
 	// Setup a small http server on localhost:1234 for testing purposes
 
@@ -416,6 +416,9 @@ func TestJsonSchemaTestSuite(t *testing.T) {
 		expectedValid, _ := strconv.ParseBool(testJson["valid"])
 		if givenValid != expectedValid {
 			t.Errorf("Test failed : %s :: %s, expects %t, given %t\n", testJson["phase"], testJson["test"], expectedValid, givenValid)
+			for _, e := range result.Errors() {
+				fmt.Println("Error: " + e.Type())
+			}
 		}
 
 		if !givenValid && testJson["errors"] != "" {
