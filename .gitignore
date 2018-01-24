@@ -1,14 +1,73 @@
-# Binaries for programs and plugins
-*.exe
-*.dll
+### https://raw.github.com/github/gitignore/ce62a06810c01a5071610ea70dcc417916029f7a/Global/OSX.gitignore
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+
+### https://raw.github.com/github/gitignore/ce62a06810c01a5071610ea70dcc417916029f7a/Global/Linux.gitignore
+
+*~
+
+# temporary files which can be created if a process still has a handle open of a deleted file
+.fuse_hidden*
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder which might appear on any partition or disk
+.Trash-*
+
+
+### https://raw.github.com/github/gitignore/ce62a06810c01a5071610ea70dcc417916029f7a/Go.gitignore
+
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
 *.so
-*.dylib
 
-# Test binary, build with `go test -c`
+# Folders
+_obj
+_test
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
 *.test
+*.prof
 
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
 
-# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
-.glide/
+### Project specific
+
+/bin/

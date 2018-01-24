@@ -1,0 +1,12 @@
+
+[[constraint]]
+  name = "github.com/fsnotify/fsnotify"
+  version = "^1"
+
+[[constraint]]
+  name = "github.com/gorhill/cronexpr"
+  version = "^1"
+
+[[constraint]]
+  name = "go.uber.org/zap"
+  version = "^1"
