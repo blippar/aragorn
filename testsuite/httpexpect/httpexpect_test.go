@@ -248,6 +248,24 @@ func TestNewWithEmptyConfig(t *testing.T) {
 	}
 }
 
+func TestNewWithInvalidRequestConfig(t *testing.T) {
+	if _, err := New(&Config{
+		Base: Base{
+			URL: "invalid_url",
+		},
+		Tests: []*Test{
+			{
+				Name: "index",
+				Request: Request{
+					Body: map[string]interface{}{"$ref": "invalid_file"},
+				},
+			},
+		},
+	}); err == nil {
+		t.Errorf("new test suite with invalid request should fail: %v", err)
+	}
+}
+
 func TestSuiteRunTestSimple(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hello, client")

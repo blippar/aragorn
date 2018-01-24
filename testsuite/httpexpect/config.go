@@ -163,10 +163,11 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 		}
 	}
 
-	_, rawDoc := t.Expect.Document.([]byte)
-	accept := test.req.Header.Get("Accept")
-	if accept == "" && (t.Expect.JSONSchema != nil || t.Expect.JSONValues != nil || (t.Expect.Document != nil && !rawDoc)) {
-		test.req.Header.Set("Accept", "application/json")
+	if test.req != nil {
+		_, isRawDoc := test.document.([]byte)
+		if test.req.Header.Get("Accept") == "" && (test.jsonSchema != nil || test.jsonValues != nil || (test.document != nil && !isRawDoc)) {
+			test.req.Header.Set("Accept", "application/json")
+		}
 	}
 
 	if err := concatErrors(errs); err != nil {
