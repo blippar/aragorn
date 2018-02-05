@@ -2,6 +2,7 @@ package httpexpect
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -63,6 +64,15 @@ func New(cfg *Config) (*Suite, error) {
 	}
 	if cfg.Base.RetryWait > 0 {
 		s.retryWait = time.Duration(cfg.Base.RetryWait) * time.Second
+	}
+	if cfg.Base.Insecure {
+		s.client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
 	}
 	return s, nil
 }

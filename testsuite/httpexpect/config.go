@@ -27,6 +27,7 @@ type Base struct {
 	OAUTH2     clientcredentials.Config
 	RetryCount int
 	RetryWait  int
+	Insecure   bool
 }
 
 type Test struct {
