@@ -2,7 +2,6 @@ package httpexpect
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,8 +9,9 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/xeipuuv/gojsonschema"
 )
+
+const maxErrorBodySize = 512
 
 var (
 	errInvalidArrayIndex   = errors.New("invalid array index")
@@ -39,39 +39,34 @@ type response struct {
 // checkResponse checks a response on which you can have expectations.
 // Any failed expectation will be logged on the logger.
 func checkResponse(test *test, logger Logger, resp *http.Response, body []byte) {
-	r := &response{
+	if resp.StatusCode != test.statusCode {
+		str := string(body)
+		if len(str) > maxErrorBodySize {
+			str = fmt.Sprintf("%s... (%d)", str[:maxErrorBodySize], len(str))
+		}
+		logger.Errorf("wrong http status code (got %d; expected %d)\n%s", resp.StatusCode, test.statusCode, str)
+		return
+	}
+	r := response{
 		test:   test,
 		logger: logger,
 		resp:   resp,
 		body:   body,
 	}
-	r.StatusCode()
-	r.ContainsHeader()
+	r.checkHeader()
 	if test.document != nil {
-		raw, ok := test.document.([]byte)
-		if ok {
-			r.MatchRawDocument(raw)
-		} else {
-			r.MatchJSONDocument(test.document)
-		}
+		r.matchDocument()
 	}
 	if test.jsonSchema != nil {
-		r.MatchJSONSchema()
+		r.matchJSONSchema()
 	}
 	if test.jsonValues != nil {
-		r.ContainsJSONValues()
+		r.containsJSONValues()
 	}
 }
 
-// StatusCode checks whether the response has the given status code.
-func (r *response) StatusCode() {
-	if r.resp.StatusCode != r.test.statusCode {
-		r.logger.Errorf("wrong http status code (got %d; expected %d)", r.resp.StatusCode, r.test.statusCode)
-	}
-}
-
-// ContainsHeader checks whether the response contains the given headers.
-func (r *response) ContainsHeader() {
+// checkHeader checks whether the response contains the given headers.
+func (r *response) checkHeader() {
 	for k, v := range r.test.header {
 		if val := r.resp.Header.Get(k); val == "" {
 			r.logger.Errorf("missing header %s", k)
@@ -81,44 +76,47 @@ func (r *response) ContainsHeader() {
 	}
 }
 
-// MatchRawDocument checks whether the raw response body matches the given document.
-func (r *response) MatchRawDocument(doc []byte) {
-	if !bytes.Equal(r.body, doc) {
+// matchDocument checks whether the test document against the body.
+func (r *response) matchDocument() {
+	if raw, ok := r.test.document.([]byte); ok {
+		if !bytes.Equal(r.body, raw) {
+			r.logger.Error("request body does not match document")
+		}
+		return
+	}
+	if !r.unmarshalJSONBody() {
+		return
+	}
+	if !cmp.Equal(r.test.document, r.dataJSON) {
 		r.logger.Error("request body does not match document")
 	}
 }
 
-// MatchJSONDocument checks whether the JSON response body matches the given document.
-func (r *response) MatchJSONDocument(doc interface{}) {
+// matchJSONSchema checks whether the JSON formated response body matches the given JSON schema.
+func (r *response) matchJSONSchema() {
 	if !r.unmarshalJSONBody() {
 		return
 	}
-	if !cmp.Equal(doc, r.dataJSON) {
-		r.logger.Error("request body does not match document")
-	}
-}
-
-// MatchJSONSchema checks whether the JSON formated response body matches the given JSON schema.
-func (r *response) MatchJSONSchema() {
-	if !r.unmarshalJSONBody() {
-		return
-	}
-	data := gojsonschema.NewGoLoader(r.dataJSON)
+	data := newJSONGoLoader(r.dataJSON)
 	result, err := r.test.jsonSchema.Validate(data)
 	if err != nil {
 		r.logger.Errorf("JSON schema validation failed: %v", err)
 		return
 	}
 	if !result.Valid() {
-		for _, err := range result.Errors() {
-			r.logger.Errorf("JSON schema validation failed: %v", err)
+		errs := result.Errors()
+		b := &bytes.Buffer{}
+		for _, err := range errs {
+			b.WriteString("\n\t- ")
+			b.WriteString(err.String())
 		}
+		r.logger.Errorf("JSON schema validation failed:%s", b.String())
 	}
 }
 
-// ContainsJSONValues checks that the JSON formated response body contains
+// containsJSONValues checks that the JSON formated response body contains
 // specific values at given keys.
-func (r *response) ContainsJSONValues() {
+func (r *response) containsJSONValues() {
 	if !r.unmarshalJSONBody() {
 		return
 	}
@@ -141,7 +139,7 @@ func (r *response) unmarshalJSONBody() bool {
 	if r.dataJSONError {
 		return false
 	}
-	if err := json.Unmarshal(r.body, &r.dataJSON); err != nil {
+	if err := decodeJSON(r.body, &r.dataJSON); err != nil {
 		r.logger.Errorf("could not decode json response body: %v", err)
 		r.dataJSONError = true
 		return false

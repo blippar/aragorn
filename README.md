@@ -45,16 +45,16 @@ The directories to watch can be specified via command line positional arguments
 A test suite describes a combination of tests to be run. It is composed of some
 configuration fields for the scheduling and notification handling. The tests are described in the suite field depending on the type field (`HTTP` or `GRPC`).
 
-| Name           | Type                       | Required | Description                                                                                                                           |
-| -------------- | -------------------------- | :------: | ------------------------------------------------------------------------------------------------------------------------------------- |
-| name           | `string`                   |    ✔️    | The name of this suite.                                                                                                               |
-| type           | `string`                   |    ✔️    | `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                               |
-| runEvery       | `string`                   |          | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
-| runCron        | `string`                   |          | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
-| slack.webhook  | `string`                   |    ✔️    | A Slack webhook used to post notifications in case this test suite fails.                                                             |
-| slack.username | `string`                   |    ✔️    | A Slack username used to post notifications in case this test suite fails.                                                            |
-| slack.channel  | `string`                   |    ✔️    | A Slack channel used to post notifications in case this test suite fails.                                                             |
-| suite          | `HTTPSuite` or `GRPCSuite` |    ✔️    | An object describing the test suite itself. Depends on the field `type`.                                                              |
+| Name           | Type                       | Description                                                                                                                           |
+| -------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| name           | `string`                   | **REQUIRED**. The name of this suite.                                                                                                 |
+| type           | `string`                   | **REQUIRED**. `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                 |
+| runEvery       | `string`                   | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
+| runCron        | `string`                   | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
+| slack.webhook  | `string`                   | A Slack webhook used to post notifications in case this test suite fails.                                                             |
+| slack.username | `string`                   | A Slack username used to post notifications in case this test suite fails.                                                            |
+| slack.channel  | `string`                   | A Slack channel used to post notifications in case this test suite fails.                                                             |
+| suite          | `HTTPSuite` or `GRPCSuite` | **REQUIRED**. An object describing the test suite itself. Depends on the field `type`.                                                |
 
 Example :
 
@@ -76,20 +76,20 @@ Example :
 
 An HTTP test suite contains a base configuration and list of tests.
 
-| Name  | Type         | Required | Description                                 |
-| ----- | ------------ | :------: | ------------------------------------------- |
-| base  | `HTTPBase`   |    ✔️    | Base description of the tests in this suite |
-| tests | `[]HTTPTest` |    ✔️    | List of tests to run.                       |
+| Name  | Type         | Description                                               |
+| ----- | ------------ | --------------------------------------------------------- |
+| base  | `HTTPBase`   | **REQUIRED**. Base description of the tests in this suite |
+| tests | `[]HTTPTest` | **REQUIRED**. List of tests to run.                       |
 
 ##### HTTPBase
 
-| Name       | Type                | Required | Description                                                                                                                    |
-| ---------- | ------------------- | :------: | ------------------------------------------------------------------------------------------------------------------------------ |
-| url        | `string`            |    ✔️    | Base URL prepended to all `path` in each test request.                                                                         |
-| header     | `map[string]string` |          | List of request header fields to add to every test in this suite. Each test can overwrite the header fields set at this level. |
-| oauth2     | `OAUTH2Config`      |          | Describes a 2-legged OAuth2 flow.                                                                                              |
-| retryCount | `int`               |          | Number of time the HTTP request can be retry. (default 1)                                                                      |
-| retryWait  | `int`               |          | Duration between each retry in second. (default 1s)                                                                            |
+| Name       | Type                | Description                                                                                                                    |
+| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| url        | `string`            | **REQUIRED**. Base URL prepended to all `path` in each test request.                                                           |
+| header     | `map[string]string` | List of request header fields to add to every test in this suite. Each test can overwrite the header fields set at this level. |
+| oauth2     | `OAUTH2Config`      | Describes a 2-legged OAuth2 flow.                                                                                              |
+| retryCount | `int`               | Number of time the HTTP request can be retry. (default 1)                                                                      |
+| retryWait  | `int`               | Duration between each retry in second. (default 1s)                                                                            |
 
 ##### OAUTH2Config
 
@@ -97,32 +97,32 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 ##### HTTPTest
 
-| Name    | Type          | Required | Description                                            |
-| ------- | ------------- | :------: | ------------------------------------------------------ |
-| name    | `string`      |    ✔️    | Name used to uniquely identify this test in the suite. |
-| request | `HTTPRequest` |    ✔️    | Description of the HTTP request to perform.            |
-| expect  | `HTTPExpect`  |    ✔️    | Expected result of the HTTP request.                   |
+| Name    | Type          | Description                                                          |
+| ------- | ------------- | -------------------------------------------------------------------- |
+| name    | `string`      | **REQUIRED**. Name used to uniquely identify this test in the suite. |
+| request | `HTTPRequest` | **REQUIRED**. Description of the HTTP request to perform.            |
+| expect  | `HTTPExpect`  | **REQUIRED**. Expected result of the HTTP request.                   |
 
 ##### HTTPRequest
 
-| Name      | Type                | Required | Description                                                             |
-| --------- | ------------------- | :------: | ----------------------------------------------------------------------- |
-| path      | `string`            |          | Path appended to the base `url` set in the `HTTPBase`. Defaults to `/`. |
-| method    | `string`            |          | HTTP method of the request. Defaults to `GET`.                          |
-| header    | `map[string]string` |          | List of request header fields.                                          |
-| multipart | `map[string]string` |          | Multipart content of the request. Values started with a `@` are files.  |
-| formData  | `map[string]string` |          | Form data as application/x-url-encoded format.                          |
-| body      | `Document`          |          | Request body.                                                           |
+| Name      | Type                | Description                                                             |
+| --------- | ------------------- | ----------------------------------------------------------------------- |
+| path      | `string`            | Path appended to the base `url` set in the `HTTPBase`. Defaults to `/`. |
+| method    | `string`            | HTTP method of the request. Defaults to `GET`.                          |
+| header    | `map[string]string` | List of request header fields.                                          |
+| multipart | `map[string]string` | Multipart content of the request. Values started with a `@` are files.  |
+| formData  | `map[string]string` | Form data as application/x-url-encoded format.                          |
+| body      | `Document`          | Request body.                                                           |
 
 ##### HTTPExpect
 
-| Name       | Type                | Required | Description                                  |
-| ---------- | ------------------- | :------: | -------------------------------------------- |
-| statusCode | `int`               |    ✔️    | Expected HTTP status code.                   |
-| header     | `map[string]string` |          | Expected key-value pairs in the HTTP header. |
-| document   | `Document`          |          | Expected document to be returned.            |
-| jsonSchema | `Object`            |          | Expected JSON schema (1) to be returned.     |
-| jsonValues | `Object`            |          | Specific JSON values to be returned.         |
+| Name       | Type                | Description                                  |
+| ---------- | ------------------- | -------------------------------------------- |
+| statusCode | `int`               | **REQUIRED**. Expected HTTP status code.     |
+| header     | `map[string]string` | Expected key-value pairs in the HTTP header. |
+| document   | `Document`          | Expected document to be returned.            |
+| jsonSchema | `Object`            | Expected JSON schema (1) to be returned.     |
+| jsonValues | `Object`            | Specific JSON values to be returned.         |
 
 1. See [json-schema.org](http://json-schema.org/) for more info.
 
@@ -228,7 +228,7 @@ every 12h:
           "header": {
             "Content-Type": "application/json"
           },
-          "jsonSchema": "@schema.json",
+          "jsonSchema": { "$ref": "schema.json" },
           "jsonValues": {
             "key": "value",
             "a.0": 1,

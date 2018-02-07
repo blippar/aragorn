@@ -3,7 +3,6 @@ package httpexpect
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -80,8 +79,8 @@ func New(cfg *Config) (*Suite, error) {
 // NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
 func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
 	cfg := &Config{}
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
+	if err := decodeJSON(data, cfg); err != nil {
+		return nil, err
 	}
 	cfg.Path = path
 	return New(cfg)

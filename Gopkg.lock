@@ -8,10 +8,10 @@
   version = "v1.4.7"
 
 [[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
-  revision = "c65a0412e71e8b9b3bfd22925720d23c0f054237"
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/google/go-cmp"
@@ -29,19 +29,19 @@
   branch = "master"
   name = "github.com/xeipuuv/gojsonpointer"
   packages = ["."]
-  revision = "6fe8760cad3569743d51ddbb243b26f8456742dc"
+  revision = "4e3ac2762d5f479393488629ee9370b50873b3a6"
 
 [[projects]]
   branch = "master"
   name = "github.com/xeipuuv/gojsonreference"
   packages = ["."]
-  revision = "e02fc20de94c78484cd5ffb007f8af96be030a45"
+  revision = "bd5ef7bd5415a7ac448318e64f11a24cd21e594b"
 
 [[projects]]
   branch = "master"
   name = "github.com/xeipuuv/gojsonschema"
   packages = ["."]
-  revision = "511d08a359d14c0dd9c4302af52ee9abb6f93c2a"
+  revision = "70e59348c29403c606624cd201e79769d6657db8"
 
 [[projects]]
   name = "go.uber.org/atomic"
@@ -63,21 +63,27 @@
 
 [[projects]]
   branch = "master"
+  name = "go4.org"
+  packages = ["errorutil"]
+  revision = "fba789b7e39ba524b9e60c45c37a50fae63a2a09"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/net"
   packages = ["context","context/ctxhttp"]
-  revision = "0ed95abb35c445290478a5348a7b38bb154135fd"
+  revision = "2fb46b16b8dda405028c50f7c7f0f9dd1fa6bfb1"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/oauth2"
   packages = [".","clientcredentials","internal"]
-  revision = "b28fcf2b08a19742b43084fb40ab78ac6c3d8067"
+  revision = "a032972e28060ca4f5644acffae3dfc268cc09db"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "af50095a40f9041b3b38960738837185c26e9419"
+  revision = "37707fdb30a5b38865cfb95e5aab41707daec7fd"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -88,6 +94,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "190c781a440dcb09af95b4de73456856c4d4798f75168a86fc6f89b084b1c83b"
+  inputs-digest = "926880cda418061c158e37a1fc78e22b64a443043d5591e7c8542cdbcb0133f5"
   solver-name = "gps-cdcl"
   solver-version = 1
