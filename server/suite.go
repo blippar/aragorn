@@ -76,7 +76,7 @@ func jsonDecodeError(r io.Reader, err error) error {
 func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 	var cfg SuiteConfig
 	if err := json.NewDecoder(r).Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("could not decode test suite file: %v", jsonDecodeError(r, err))
+		return nil, fmt.Errorf("could not decode suite: %v", jsonDecodeError(r, err))
 	}
 	var runEvery time.Duration
 	if cfg.RunCron == "" && cfg.RunEvery == "" {
@@ -84,7 +84,7 @@ func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 	} else if cfg.RunEvery != "" {
 		d, err := time.ParseDuration(cfg.RunEvery)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse duration in test suite file: %v", err)
+			return nil, fmt.Errorf("could not parse runEvery duration in suite: %v", err)
 		}
 		runEvery = d
 	}
@@ -114,7 +114,7 @@ func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
 func (s *Server) NewSuiteFromFile(path string) (*Suite, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open test suite file: %v", err)
+		return nil, fmt.Errorf("could not open suite file: %v", err)
 	}
 	defer f.Close()
 	dir := filepath.Dir(path)
