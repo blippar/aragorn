@@ -41,6 +41,7 @@ func run() int {
 		&execCommand{},
 		&listCommand{},
 		&versionCommand{},
+		&initCommand{},
 	}
 
 	usage := func(w io.Writer) {
