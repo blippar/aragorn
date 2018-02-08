@@ -38,6 +38,7 @@ func (*initCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	s.Name = pkg + " test suite"
 	if len(args) > 0 && args[0] != "" {
 		if args[0] != "HTTP" && args[0] != "GRPC" {
