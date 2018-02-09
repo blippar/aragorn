@@ -10,6 +10,7 @@ import (
 
 	"github.com/xeipuuv/gojsonschema"
 
+	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -39,9 +40,6 @@ type test struct {
 	jsonSchema *gojsonschema.Schema   // Compiled jsonschema.
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
-
-// RunOption is a function that configures a Suite.
-type RunOption func(*Suite)
 
 // New returns a Suite.
 func New(cfg *Config) (*Suite, error) {
@@ -74,16 +72,6 @@ func New(cfg *Config) (*Suite, error) {
 		}
 	}
 	return s, nil
-}
-
-// NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
-func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
-	cfg := &Config{}
-	if err := decodeJSON(data, cfg); err != nil {
-		return nil, err
-	}
-	cfg.Path = path
-	return New(cfg)
 }
 
 // Run runs all the tests in the suite.
@@ -154,5 +142,14 @@ func (t *test) cloneRequest() *http.Request {
 }
 
 func init() {
-	testsuite.Register("HTTP", NewSuiteFromJSON)
+	plugin.Register(&plugin.Registration{
+		Type:   plugin.TestSuitePlugin,
+		ID:     "HTTP",
+		Config: (*Config)(nil),
+		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
+			cfg := ctx.Config.(*Config)
+			cfg.Path = ctx.Root
+			return New(cfg)
+		},
+	})
 }
