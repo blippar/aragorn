@@ -33,6 +33,8 @@ failure or error. If everything ran without any issue, no notification is sent.
 
 ## Quick Start
 
+You can add Aragorn to your project by doing `aragorn init`
+
 The directories to watch can be specified via command line positional arguments
 : `./aragorn run dir1 dir2`.
 
