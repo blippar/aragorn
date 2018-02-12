@@ -6,21 +6,31 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"time"
 
 	"go4.org/errorutil"
 )
 
 type Config struct {
-	Plugins  map[string]json.RawMessage
-	Services map[string]ServiceConfig
+	Notifiers map[string]json.RawMessage
+	Suites    []SuiteConfig
+	// StartupDelay duration
 }
 
-type ServiceConfig struct {
-	Path     string
-	URL      string
-	RunEvery string // parsable by time.ParseDuration
-	RunCron  string // cron string
-	FailFast bool   // stop after first test failure
+type duration time.Duration
+
+// UnmarshalJSON unmarshals b from string if double quotes around e.g. "1m10s" or an int in nanosecond.
+func (d *duration) UnmarshalJSON(b []byte) error {
+	if len(b) > 2 && b[0] == '"' && b[len(b)-1] == '"' {
+		sd := string(b[1 : len(b)-1])
+		dur, err := time.ParseDuration(sd)
+		*d = duration(dur)
+		return err
+	}
+	dur, err := strconv.ParseInt(string(b), 10, 64)
+	*d = duration(dur)
+	return err
 }
 
 type namer interface {

@@ -25,5 +25,5 @@ func (cmd *execCommand) Register(fs *flag.FlagSet) {
 }
 
 func (cmd *execCommand) Run(args []string) error {
-	return server.New(args, cmd.failfast).Exec()
+	return server.Exec(args, cmd.failfast)
 }

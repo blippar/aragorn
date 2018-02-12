@@ -41,7 +41,7 @@
   branch = "master"
   name = "github.com/xeipuuv/gojsonschema"
   packages = ["."]
-  revision = "70e59348c29403c606624cd201e79769d6657db8"
+  revision = "8bcffc811467a5f691810420385be6e66b35a317"
 
 [[projects]]
   name = "go.uber.org/atomic"
@@ -71,13 +71,13 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","context/ctxhttp"]
-  revision = "2fb46b16b8dda405028c50f7c7f0f9dd1fa6bfb1"
+  revision = "f5dfe339be1d06f81b22525fe34671ee7d2c8904"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/oauth2"
   packages = [".","clientcredentials","internal"]
-  revision = "a032972e28060ca4f5644acffae3dfc268cc09db"
+  revision = "543e37812f10c46c622c9575afd7ad22f22a12ba"
 
 [[projects]]
   branch = "master"

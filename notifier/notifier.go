@@ -47,6 +47,10 @@ func (r *Report) Done() {
 	r.Duration = time.Since(r.Start)
 }
 
+func (r *Report) FailFast() bool {
+	return r.failfast
+}
+
 func newTestReport(name string, failfast bool) *TestReport {
 	return &TestReport{
 		Name:     name,

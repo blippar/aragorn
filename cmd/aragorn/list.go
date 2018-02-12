@@ -21,5 +21,5 @@ func (*listCommand) Hidden() bool      { return false }
 func (*listCommand) Register(fs *flag.FlagSet) {}
 
 func (*listCommand) Run(args []string) error {
-	return server.New(args, false).List()
+	return server.List(args)
 }

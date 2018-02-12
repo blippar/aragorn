@@ -7,12 +7,10 @@ import (
 	"github.com/blippar/aragorn/log"
 )
 
-// Printer is a reporter that stacks errors for later use.
-// Stacked errors are printed on each report and removed from the stack.
 type printer struct{}
 
-// NewPrinter returns a new Printer.
-func NewPrinter() Notifier {
+// NewLogNotifier returns a new log printer.
+func NewLogNotifier() Notifier {
 	return &printer{}
 }
 

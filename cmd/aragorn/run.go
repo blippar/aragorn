@@ -29,8 +29,8 @@ func (cmd *runCommand) Register(fs *flag.FlagSet) {
 }
 
 func (cmd *runCommand) Run(args []string) error {
-	srv := server.New(args, cmd.failfast)
-	if err := srv.Start(); err != nil {
+	srv := server.New(cmd.failfast)
+	if err := srv.Watch(args); err != nil {
 		return fmt.Errorf("could not start service: %v", err)
 	}
 	sigCh := make(chan os.Signal, 1)
