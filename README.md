@@ -2,22 +2,15 @@
 
 ## Description
 
-Aragorn is a regression testing tool that can run a set of tests (test suites)
-periodically. It acts as a server that watches for changes a list of
-directories. When a file describing a test suite (a JSON file with the
-`.suite.json` extension, see example below for more information) is added to one
-of the watched directories, it is analysed, prepared and scheduled to be run
-based on its own configuration. If a file is deleted, it will remove this test
-suite from the scheduler and it will not be run anymore. If a file is modified,
-the old test suite is removed from the scheduler and a new one is created, it is
-equivalent to remove the file and create a new one.
+Aragorn is a regression testing tool that can run a set of tests periodically.
+It acts as a server that can execute or schedule test suites.
+(a JSON file with the `.suite.json` extension, see example below for more information)
 
 When a test suite is run, each of its tests is executed. For each test, there
 are 3 possible outcomes:
 
 * the test's request is successful and its response is expected: nothing happens
-* the test's request is successful but its response is unexpected: failures are
-  reported
+* the test's request is successful but its response is unexpected: failures are reported
 * the test's request can not be performed : the error is reported
 
 > A request error can be an HTTP error while trying to make the request for
@@ -28,19 +21,14 @@ Where the failures/errors are reported and how they are reported depends on the
 notifier configured. For now the only one implemented is the SlackNotifier. It
 is set at the initialization of a test suite. During a test suite execution, it
 stacks every potential failure and/or error. At the end of the suite execution,
-it will send a notification describing what happened if there was any
-failure or error. If everything ran without any issue, no notification is sent.
+it will send a notification describing what happened if there was any failure or error.
 
 ## Quick Start
 
 The directories to watch can be specified via command line positional arguments
-: `./aragorn run dir1 dir2`.
+: `aragorn watch dir1 dir2`.
 
-## Test Suites
-
-### Creating a test suite
-
-#### Config
+## Config
 
 The config is only used by the run command.
 It contains a list of suites to execute or schedule and the notifiers.
@@ -78,7 +66,20 @@ Example:
 }
 ```
 
-#### SuiteConfig
+## Notifiers
+
+### Slack
+
+| Name     | Type     | Description                                       |
+| -------- | -------- | ------------------------------------------------- |
+| webhook  | `string` | URL to the Incoming Webhook for the HTTP request. |
+| username | `string` | Username of the bot.                              |
+| channel  | `string` | Channel where the notification will be send.      |
+| verbose  | `bool`   | Log all tests.                                    |
+
+## Test Suites
+
+### SuiteConfig
 
 A test suite describes a combination of tests to be run. It is composed of some
 configuration fields for the scheduling and notification handling. The tests are described in the suite field depending on the type field (`HTTP` or `GRPC`).
@@ -104,7 +105,7 @@ Example:
 }
 ```
 
-#### HTTPSuite
+### HTTPSuite
 
 An HTTP test suite contains a base configuration and list of tests.
 
@@ -113,7 +114,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | base  | `HTTPBase`   | **REQUIRED**. Base description of the tests in this suite |
 | tests | `[]HTTPTest` | **REQUIRED**. List of tests to run.                       |
 
-##### HTTPBase
+#### HTTPBase
 
 | Name       | Type                | Description                                                                                                                    |
 | ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -124,11 +125,11 @@ An HTTP test suite contains a base configuration and list of tests.
 | retryWait  | `int`               | Duration between each retry in second. (default 1s)                                                                            |
 | insecure   | `bool`              | Insecure controls whether a client verifies the server's certificate chain and host name.                                      |
 
-##### OAUTH2Config
+#### OAUTH2Config
 
 See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.org/golang.org/x/oauth2/clientcredentials#Config) for more info.
 
-##### HTTPTest
+#### HTTPTest
 
 | Name    | Type          | Description                                                          |
 | ------- | ------------- | -------------------------------------------------------------------- |
@@ -136,7 +137,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | request | `HTTPRequest` | **REQUIRED**. Description of the HTTP request to perform.            |
 | expect  | `HTTPExpect`  | **REQUIRED**. Expected result of the HTTP request.                   |
 
-##### HTTPRequest
+#### HTTPRequest
 
 | Name      | Type                | Description                                                             |
 | --------- | ------------------- | ----------------------------------------------------------------------- |
@@ -147,7 +148,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | formData  | `map[string]string` | Form data as application/x-url-encoded format.                          |
 | body      | `Document`          | Request body.                                                           |
 
-##### HTTPExpect
+#### HTTPExpect
 
 | Name       | Type                | Description                                  |
 | ---------- | ------------------- | -------------------------------------------- |
@@ -159,7 +160,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 1. See [json-schema.org](http://json-schema.org/) for more info.
 
-##### Document
+#### Document
 
 Document is any type with some special behaviors like reference.
 
@@ -188,12 +189,12 @@ Inline RAW document:
 }
 ```
 
-##### Object
+#### Object
 
 Object must be a JSON object (`map[string]interface{}`). It can load a JSON
 object from a file (see `Document` doc).
 
-#### GRPC Suite
+### GRPC Suite
 
 Work in progress...
 
