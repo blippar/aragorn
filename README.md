@@ -40,34 +40,66 @@ The directories to watch can be specified via command line positional arguments
 
 ### Creating a test suite
 
+#### Config
+
+The config is only used by the run command.
+It contains a list of suites to execute or schedule and the notifiers.
+
+| Name       | Type                     | Description                                          |
+| ---------- | ------------------------ | ---------------------------------------------------- |
+| notifiers  | `map[string]interface{}` | the notifiers configurations.                        |
+| suites     | `[]SuiteConfig`          | List of suites to load.                              |
+| consoleLog | `bool`                   | Log the suite reports on the console. (default true) |
+
+Example:
+
+```json
+{
+  "notifiers": {
+    "slack": {
+      "webhook": "https://hooks.slack.com/services/T/B/1",
+      "verbose": true
+    }
+  },
+  "suites": [
+    {
+      "path": "./test/service.suite.json",
+      "runEvery": "1h",
+      "failFast": true,
+      "suite": {
+        "base": {
+          "url": "https://example.com",
+          "insecure": true
+        }
+      }
+    }
+  ],
+  "consoleLog": false
+}
+```
+
 #### SuiteConfig
 
 A test suite describes a combination of tests to be run. It is composed of some
 configuration fields for the scheduling and notification handling. The tests are described in the suite field depending on the type field (`HTTP` or `GRPC`).
 
-| Name           | Type                       | Description                                                                                                                           |
-| -------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| name           | `string`                   | **REQUIRED**. The name of this suite.                                                                                                 |
-| type           | `string`                   | **REQUIRED**. `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                 |
-| runEvery       | `string`                   | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
-| runCron        | `string`                   | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
-| slack.webhook  | `string`                   | A Slack webhook used to post notifications in case this test suite fails.                                                             |
-| slack.username | `string`                   | A Slack username used to post notifications in case this test suite fails.                                                            |
-| slack.channel  | `string`                   | A Slack channel used to post notifications in case this test suite fails.                                                             |
-| suite          | `HTTPSuite` or `GRPCSuite` | **REQUIRED**. An object describing the test suite itself. Depends on the field `type`.                                                |
+| Name     | Type                       | Description                                                                                                                           |
+| -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| path     | `string`                   | Path to the `SuiteConfig` only used in `Config.suites`                                                                                |
+| name     | `string`                   | **REQUIRED**. The name of this suite.                                                                                                 |
+| type     | `string`                   | **REQUIRED**. `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                 |
+| runEvery | `string`                   | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
+| runCron  | `string`                   | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
+| failFast | `bool`                     | Stop after first test failure                                                                                                         |
+| suite    | `HTTPSuite` or `GRPCSuite` | **REQUIRED**. An object describing the test suite itself. Depends on the field `type`.                                                |
 
-Example :
+Example:
 
 ```json
 {
     "name": "Service 1 HTTP test suite",
     "type": "HTTP",
     "runEvery": "12h",
-    "slack": {
-      "webhook": "https://hooks.slack.com/services/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",
-      "username": "test-bot",
-      "channel": "testing"
-    },
     "suite": {"..."}
 }
 ```
@@ -90,6 +122,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | oauth2     | `OAUTH2Config`      | Describes a 2-legged OAuth2 flow.                                                                                              |
 | retryCount | `int`               | Number of time the HTTP request can be retry. (default 1)                                                                      |
 | retryWait  | `int`               | Duration between each retry in second. (default 1s)                                                                            |
+| insecure   | `bool`              | Insecure controls whether a client verifies the server's certificate chain and host name.                                      |
 
 ##### OAUTH2Config
 
@@ -179,12 +212,6 @@ every 12h:
   "name": "Service 1 HTTP test suite",
   "type": "HTTP",
   "runEvery": "12h",
-  "slack": {
-    "webhook":
-      "https://hooks.slack.com/services/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",
-    "username": "test-bot",
-    "channel": "testing"
-  },
   "suite": {
     "base": {
       "url": "http://localhost:8080",
