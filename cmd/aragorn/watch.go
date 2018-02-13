@@ -7,10 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/blippar/aragorn/log"
-	"github.com/blippar/aragorn/server"
 	"github.com/fsnotify/fsnotify"
 	"go.uber.org/zap"
+
+	"github.com/blippar/aragorn/log"
+	"github.com/blippar/aragorn/server"
 )
 
 const watchHelp = `Watch the test suites in the directories and execute them on create or update`

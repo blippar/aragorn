@@ -6,9 +6,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/server"
-	"go.uber.org/zap"
 )
 
 const runHelp = `schedule the test suites in the configuration`

@@ -149,10 +149,6 @@ func init() {
 		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
 			cfg := ctx.Config.(*Config)
 			cfg.Path = ctx.Root
-			// TODO: Add metadata in init context.
-			// if url, ok := ctx.Metadata["url"]; ok {
-			// 	cfg.Base.URL = url
-			// }
 			return New(cfg)
 		},
 	})

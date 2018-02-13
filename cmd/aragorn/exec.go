@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/server"
-	"go.uber.org/zap"
 )
 
 const execHelp = `Execute the test suites in the directories`
