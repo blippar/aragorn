@@ -11,6 +11,7 @@ import (
 
 	"github.com/blippar/aragorn/log"
 
+	_ "github.com/blippar/aragorn/notifier/slack"
 	_ "github.com/blippar/aragorn/testsuite/grpcexpect"
 	_ "github.com/blippar/aragorn/testsuite/httpexpect"
 )
@@ -39,6 +40,7 @@ func run() int {
 	commands := [...]command{
 		&runCommand{},
 		&execCommand{},
+		&watchCommand{},
 		&listCommand{},
 		&versionCommand{},
 	}

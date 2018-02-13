@@ -3,19 +3,86 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"time"
 
+	"go.uber.org/zap"
 	"go4.org/errorutil"
+
+	"github.com/blippar/aragorn/log"
+	"github.com/blippar/aragorn/notifier"
+	"github.com/blippar/aragorn/plugin"
 )
 
 type Config struct {
-	Notifiers map[string]json.RawMessage
-	Suites    []SuiteConfig
+	Notifiers  map[string]json.RawMessage
+	Suites     []*SuiteConfig
+	ConsoleLog bool
 	// StartupDelay duration
+}
+
+func NewConfigFromReader(r io.Reader) (*Config, error) {
+	cfg := &Config{
+		ConsoleLog: true,
+	}
+	if err := decodeReaderJSON(r, cfg); err != nil {
+		return nil, fmt.Errorf("could not decode config: %v", jsonDecodeError(r, err))
+	}
+	return cfg, nil
+}
+
+func NewConfigFromFile(path string) (*Config, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open config file: %v", err)
+	}
+	defer f.Close()
+	return NewConfigFromReader(f)
+}
+
+func (cfg *Config) GenSuites(failfast bool) ([]*Suite, error) {
+	var notifiers []notifier.Notifier
+	for id, ncfg := range cfg.Notifiers {
+		n, err := genNotifierPlugin(id, ncfg)
+		if err != nil {
+			log.Error("setup notifier plugin", zap.String("id", id), zap.Error(err))
+			continue
+		}
+		notifiers = append(notifiers, n.(notifier.Notifier))
+	}
+	if cfg.ConsoleLog || len(notifiers) == 0 {
+		notifiers = append(notifiers, logNotifier)
+	}
+	n := notifier.Multi(notifiers...)
+	suites := make([]*Suite, len(cfg.Suites))
+	for i, scfg := range cfg.Suites {
+		suite, err := NewSuiteFromSuiteConfig(scfg, failfast, n)
+		if err != nil {
+			return nil, err
+		}
+		suites[i] = suite
+	}
+	return suites, nil
+}
+
+func genNotifierPlugin(id string, cfg []byte) (notifier.Notifier, error) {
+	reg := plugin.Get(plugin.NotifierPlugin, id)
+	if reg == nil {
+		return nil, errors.New("plugin not found")
+	}
+	ic := plugin.NewContext(reg, "")
+	if err := decodeJSON(cfg, ic.Config); err != nil {
+		return nil, fmt.Errorf("could not decode notifier config: %v", err)
+	}
+	n, err := reg.Init(ic)
+	if err != nil {
+		return nil, err
+	}
+	return n.(notifier.Notifier), nil
 }
 
 type duration time.Duration

@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-
-	"github.com/blippar/aragorn/server"
+	"fmt"
+	"os"
+	"text/tabwriter"
 )
 
 const listHelp = `List the test suites in the directories`
@@ -21,5 +22,15 @@ func (*listCommand) Hidden() bool      { return false }
 func (*listCommand) Register(fs *flag.FlagSet) {}
 
 func (*listCommand) Run(args []string) error {
-	return server.List(args)
+	suites, err := getSuitesFromDirs(args, false)
+	if err != nil {
+		return err
+	}
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "Path\tName\tType")
+	for _, s := range suites {
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", s.Path(), s.Name(), s.Type())
+	}
+	tw.Flush()
+	return nil
 }
