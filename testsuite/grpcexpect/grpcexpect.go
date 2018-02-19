@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/blippar/aragorn/log"
+	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -15,16 +16,17 @@ func New() (*Suite, error) {
 	return nil, errors.New("Not implemented")
 }
 
-// NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
-func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
-	return New()
-}
-
 // Run runs all the tests in the suite.
 func (s *Suite) Run(r testsuite.Report) {
 	log.Error("not implemented")
 }
 
 func init() {
-	testsuite.Register("GRPC", NewSuiteFromJSON)
+	plugin.Register(&plugin.Registration{
+		Type: plugin.TestSuitePlugin,
+		ID:   "GRPC",
+		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
+			return New()
+		},
+	})
 }

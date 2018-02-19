@@ -28,12 +28,12 @@ func (*versionCommand) Register(fs *flag.FlagSet) {}
 
 func (*versionCommand) Run(args []string) error {
 	fmt.Printf(`aragorn:
-		version     : %s
-		build date  : %s
-		git hash    : %s
-		go version  : %s
-		go compiler : %s
-		platform    : %s/%s
+ version     : %s
+ build date  : %s
+ git hash    : %s
+ go version  : %s
+ go compiler : %s
+ platform    : %s/%s
 `, version, buildDate, commitHash,
 		runtime.Version(), runtime.Compiler, runtime.GOOS, runtime.GOARCH)
 	return nil

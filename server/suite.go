@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,13 +9,12 @@ import (
 	"time"
 
 	"github.com/blippar/aragorn/notifier"
-	"github.com/blippar/aragorn/notifier/slack"
+	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
 
-var errNoSchedulingRule = errors.New("no scheduling rule set in test suite file: please set runCron or runEvery")
-
 type Suite struct {
+	path     string
 	name     string
 	suite    testsuite.Suite
 	notifier notifier.Notifier
@@ -26,74 +24,97 @@ type Suite struct {
 	failfast bool
 }
 
+func (s *Suite) Path() string { return s.path }
+func (s *Suite) Name() string { return s.name }
+func (s *Suite) Type() string { return s.typ }
+
 type SuiteConfig struct {
-	// Name used to identify this test suite.
-	Name string
-
-	RunEvery string // parsable by time.ParseDuration
+	Path     string
+	Name     string // identifier for this test suite.
+	RunEvery duration
 	RunCron  string // cron string
-
-	Slack struct {
-		Webhook  string
-		Username string
-		Channel  string
-	}
-
-	FailFast bool // stop after first test failure
-
+	FailFast bool   // stop after first test failure
 	// Type of the test suite, can be HTTP or GRPC.
 	Type string
-
 	// Description of the test suite, depends on Type.
 	Suite json.RawMessage
 }
 
-func (s *Server) NewSuiteFromReader(dir string, r io.Reader) (*Suite, error) {
-	var cfg SuiteConfig
-	if err := json.NewDecoder(r).Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("could not decode test suite file: %v", err)
+func NewSuiteFromReader(r io.Reader, failfast bool, baseCfg *SuiteConfig) (*Suite, error) {
+	cfg := &SuiteConfig{}
+	if err := decodeReaderJSON(r, cfg); err != nil {
+		return nil, fmt.Errorf("could not decode suite: %v", jsonDecodeError(r, err))
 	}
-	var runEvery time.Duration
-	if cfg.RunCron == "" && cfg.RunEvery == "" {
-		return nil, errNoSchedulingRule
-	} else if cfg.RunEvery != "" {
-		d, err := time.ParseDuration(cfg.RunEvery)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse duration in test suite file: %v", err)
+	reg := plugin.Get(plugin.TestSuitePlugin, cfg.Type)
+	if reg == nil {
+		return nil, fmt.Errorf("unsupported test suite type: %q", cfg.Type)
+	}
+	path, root := "", ""
+	if n, ok := r.(namer); ok {
+		path = n.Name()
+		root = filepath.Dir(path)
+	}
+	ic := plugin.NewContext(reg, root)
+	if err := decodeJSON(cfg.Suite, ic.Config); err != nil {
+		return nil, fmt.Errorf("could not decode test suite: %v", err)
+	}
+	if baseCfg != nil && baseCfg.Suite != nil {
+		if err := decodeJSON(baseCfg.Suite, ic.Config); err != nil {
+			return nil, fmt.Errorf("could not decode base test suite: %v", err)
 		}
-		runEvery = d
 	}
-	newSuite, err := testsuite.Get(cfg.Type)
+	suite, err := reg.Init(ic)
 	if err != nil {
 		return nil, err
 	}
-	n := notifier.NewPrinter()
-	if cfg.Slack.Webhook != "" && cfg.Slack.Username != "" && cfg.Slack.Channel != "" {
-		n = notifier.Multi(n, slack.New(cfg.Slack.Webhook, cfg.Slack.Username, cfg.Slack.Channel))
-	}
-	suite, err := newSuite(dir, cfg.Suite)
-	if err != nil {
-		return nil, err
-	}
-	return &Suite{
-		name:     cfg.Name,
-		suite:    suite,
-		notifier: n,
+	s := &Suite{
+		path:     path,
+		suite:    suite.(testsuite.Suite),
+		notifier: logNotifier,
+		failfast: failfast,
 		typ:      cfg.Type,
-		runCron:  cfg.RunCron,
-		runEvery: runEvery,
-		failfast: s.failfast || cfg.FailFast,
-	}, nil
+	}
+	s.fromConfig(cfg)
+	if baseCfg != nil {
+		s.fromConfig(baseCfg)
+	}
+	return s, nil
 }
 
-func (s *Server) NewSuiteFromFile(path string) (*Suite, error) {
+func NewSuiteFromFile(path string, failfast bool) (*Suite, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open test suite file: %v", err)
+		return nil, fmt.Errorf("could not open suite file: %v", err)
 	}
 	defer f.Close()
-	dir := filepath.Dir(path)
-	return s.NewSuiteFromReader(dir, f)
+	return NewSuiteFromReader(f, failfast, nil)
+}
+
+func NewSuiteFromSuiteConfig(baseCfg *SuiteConfig, failfast bool, n notifier.Notifier) (*Suite, error) {
+	f, err := os.Open(baseCfg.Path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open suite file: %v", err)
+	}
+	defer f.Close()
+	s, err := NewSuiteFromReader(f, failfast, baseCfg)
+	if err != nil {
+		return nil, err
+	}
+	s.notifier = n
+	return s, nil
+}
+
+func (s *Suite) fromConfig(cfg *SuiteConfig) {
+	if cfg.Name != "" {
+		s.name = cfg.Name
+	}
+	if cfg.RunEvery != 0 {
+		s.runEvery = time.Duration(cfg.RunEvery)
+	}
+	if cfg.RunCron != "" {
+		s.runCron = cfg.RunCron
+	}
+	s.failfast = s.failfast || cfg.FailFast
 }
 
 func (s *Suite) Run() {

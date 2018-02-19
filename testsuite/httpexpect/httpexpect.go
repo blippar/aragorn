@@ -2,7 +2,7 @@ package httpexpect
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/xeipuuv/gojsonschema"
 
+	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -40,9 +41,6 @@ type test struct {
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
 
-// RunOption is a function that configures a Suite.
-type RunOption func(*Suite)
-
 // New returns a Suite.
 func New(cfg *Config) (*Suite, error) {
 	tests, err := cfg.genTests()
@@ -64,17 +62,16 @@ func New(cfg *Config) (*Suite, error) {
 	if cfg.Base.RetryWait > 0 {
 		s.retryWait = time.Duration(cfg.Base.RetryWait) * time.Second
 	}
-	return s, nil
-}
-
-// NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
-func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
-	cfg := &Config{}
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
+	if cfg.Base.Insecure {
+		s.client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
 	}
-	cfg.Path = path
-	return New(cfg)
+	return s, nil
 }
 
 // Run runs all the tests in the suite.
@@ -145,5 +142,14 @@ func (t *test) cloneRequest() *http.Request {
 }
 
 func init() {
-	testsuite.Register("HTTP", NewSuiteFromJSON)
+	plugin.Register(&plugin.Registration{
+		Type:   plugin.TestSuitePlugin,
+		ID:     "HTTP",
+		Config: (*Config)(nil),
+		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
+			cfg := ctx.Config.(*Config)
+			cfg.Path = ctx.Root
+			return New(cfg)
+		},
+	})
 }
