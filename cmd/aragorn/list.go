@@ -7,7 +7,8 @@ import (
 	"text/tabwriter"
 )
 
-const listHelp = `List the test suites in the directories`
+const listShortHelp = `List the test suites`
+const listLongHelp = `List the test suites` + fileHelp
 
 type listCommand struct{}
 
@@ -15,14 +16,14 @@ func (*listCommand) Name() string { return "list" }
 func (*listCommand) Args() string {
 	return "[file ...]"
 }
-func (*listCommand) ShortHelp() string { return listHelp }
-func (*listCommand) LongHelp() string  { return listHelp }
+func (*listCommand) ShortHelp() string { return listShortHelp }
+func (*listCommand) LongHelp() string  { return listLongHelp }
 func (*listCommand) Hidden() bool      { return false }
 
 func (*listCommand) Register(fs *flag.FlagSet) {}
 
 func (*listCommand) Run(args []string) error {
-	suites, err := getSuitesFromDirs(args, false)
+	suites, err := getSuitesFromArgs(args, false)
 	if err != nil {
 		return err
 	}

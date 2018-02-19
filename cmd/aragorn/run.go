@@ -12,11 +12,11 @@ import (
 	"github.com/blippar/aragorn/server"
 )
 
-const runHelp = `schedule the test suites in the configuration`
+const runHelp = `Schedule the test suites in the configuration file`
 
 type runCommand struct {
 	config   string
-	exec     bool
+	execOnly bool
 	failfast bool
 }
 
@@ -29,9 +29,9 @@ func (*runCommand) LongHelp() string  { return runHelp }
 func (*runCommand) Hidden() bool      { return false }
 
 func (cmd *runCommand) Register(fs *flag.FlagSet) {
-	fs.StringVar(&cmd.config, "config", "config.json", "path to your config file")
-	fs.BoolVar(&cmd.exec, "exec", false, "execute the suites only")
-	fs.BoolVar(&cmd.failfast, "failfast", false, "stop after first test failure")
+	fs.StringVar(&cmd.config, "config", "config.json", "Path to your config file")
+	fs.BoolVar(&cmd.execOnly, "exec-only", false, "Execute the test suites without scheduling")
+	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
 }
 
 func (cmd *runCommand) Run(args []string) error {
@@ -39,7 +39,7 @@ func (cmd *runCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	if cmd.exec {
+	if cmd.execOnly {
 		srv.Exec()
 	} else {
 		if err := srv.Start(); err != nil {

@@ -13,7 +13,8 @@ import (
 	"github.com/blippar/aragorn/server"
 )
 
-const execHelp = `Execute the test suites in the directories`
+const execShortHelp = `Execute the test suites`
+const execLongHelp = `Execute the test suites` + fileHelp
 
 type execCommand struct {
 	failfast bool
@@ -23,16 +24,16 @@ func (*execCommand) Name() string { return "exec" }
 func (*execCommand) Args() string {
 	return "[file ...]"
 }
-func (*execCommand) ShortHelp() string { return execHelp }
-func (*execCommand) LongHelp() string  { return execHelp }
+func (*execCommand) ShortHelp() string { return execShortHelp }
+func (*execCommand) LongHelp() string  { return execLongHelp }
 func (*execCommand) Hidden() bool      { return false }
 
 func (cmd *execCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.failfast, "failfast", false, "stop after first test failure")
+	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
 }
 
 func (cmd *execCommand) Run(args []string) error {
-	suites, err := getSuitesFromDirs(args, cmd.failfast)
+	suites, err := getSuitesFromArgs(args, cmd.failfast)
 	if err != nil {
 		return err
 	}
@@ -43,9 +44,9 @@ func (cmd *execCommand) Run(args []string) error {
 	return nil
 }
 
-func getSuitesFromDirs(dirs []string, failfast bool) ([]*server.Suite, error) {
-	if len(dirs) == 0 {
-		dirs = []string{"."}
+func getSuitesFromArgs(args []string, failfast bool) ([]*server.Suite, error) {
+	if len(args) == 0 {
+		args = []string{"."}
 	}
 	var paths []string
 	walkFn := func(path string, info os.FileInfo, err error) error {
@@ -58,13 +59,18 @@ func getSuitesFromDirs(dirs []string, failfast bool) ([]*server.Suite, error) {
 		paths = append(paths, path)
 		return nil
 	}
-	for _, dir := range dirs {
-		if strings.HasSuffix(dir, server.TestSuiteJSONSuffix) {
-			paths = append(paths, dir)
-			continue
+	for _, arg := range args {
+		fi, err := os.Stat(arg)
+		if err != nil {
+			return nil, err
 		}
-		if err := filepath.Walk(dir, walkFn); err != nil {
-			return nil, fmt.Errorf("could not walk %q directory: %v", dir, err)
+		switch mode := fi.Mode(); {
+		case mode.IsDir():
+			if err := filepath.Walk(arg, walkFn); err != nil {
+				return nil, fmt.Errorf("could not walk %q directory: %v", arg, err)
+			}
+		case mode.IsRegular():
+			paths = append(paths, arg)
 		}
 	}
 	suites := make([]*server.Suite, len(paths))

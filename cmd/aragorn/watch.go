@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -14,7 +15,8 @@ import (
 	"github.com/blippar/aragorn/server"
 )
 
-const watchHelp = `Watch the test suites in the directories and execute them on create or update`
+const watchShortHelp = `Watch the test suites and execute them on create or save`
+const watchLongHelp = `Watch the test suites and execute them on create or save` + fileHelp
 
 var (
 	errFSEventsChClosed = errors.New("fsnotify events channel closed")
@@ -29,31 +31,40 @@ func (*watchCommand) Name() string { return "watch" }
 func (*watchCommand) Args() string {
 	return "[file ...]"
 }
-func (*watchCommand) ShortHelp() string { return watchHelp }
-func (*watchCommand) LongHelp() string  { return watchHelp }
+func (*watchCommand) ShortHelp() string { return watchShortHelp }
+func (*watchCommand) LongHelp() string  { return watchLongHelp }
 func (*watchCommand) Hidden() bool      { return false }
 
 func (cmd *watchCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.failfast, "failfast", false, "stop after first test failure")
+	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
 }
 
-func (cmd *watchCommand) Run(dirs []string) error {
-	if len(dirs) == 0 {
-		dirs = []string{"."}
+func (cmd *watchCommand) Run(args []string) error {
+	if len(args) == 0 {
+		args = []string{"."}
 	}
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("could not create new fsnotify watcher: %v", err)
 	}
 	defer fsw.Close()
-	log.Info("adding directories to fsnotify watcher")
-	for _, dir := range dirs {
-		if err := fsw.Add(dir); err != nil {
-			return fmt.Errorf("could not add %q directory to fsnotify watcher: %v", dir, err)
+	log.Info("adding files to fsnotify watcher")
+	argFiles := make(map[string]bool)
+	for _, arg := range args {
+		name := filepath.Clean(arg)
+		if err := fsw.Add(name); err != nil {
+			return fmt.Errorf("could not add %q directory to fsnotify watcher: %v", arg, err)
+		}
+		fi, err := os.Stat(name)
+		if err != nil {
+			return err
+		}
+		if fi.Mode().IsRegular() {
+			argFiles[name] = true
 		}
 	}
 	errCh := make(chan error, 2)
-	go func() { errCh <- fsWatchEventLoop(fsw.Events) }()
+	go func() { errCh <- fsWatchEventLoop(fsw.Events, argFiles) }()
 	go func() { errCh <- fsWatchErrorLoop(fsw.Errors) }()
 	select {
 	case err := <-errCh:
@@ -62,21 +73,14 @@ func (cmd *watchCommand) Run(dirs []string) error {
 	return nil
 }
 
-func fsWatchEventLoop(events <-chan fsnotify.Event) error {
+func fsWatchEventLoop(events <-chan fsnotify.Event, argFiles map[string]bool) error {
 	for e := range events {
 		log.Debug("watch event", zap.String("file", e.Name), zap.String("op", e.Op.String()))
-		if strings.HasSuffix(e.Name, server.TestSuiteJSONSuffix) {
-			fsHandleTestSuiteFileEvent(e)
+		if isValidEvent(e.Op) && (strings.HasSuffix(e.Name, server.TestSuiteJSONSuffix) || argFiles[e.Name]) {
+			runSuiteFromFile(e.Name)
 		}
 	}
 	return errFSEventsChClosed
-}
-
-func fsHandleTestSuiteFileEvent(e fsnotify.Event) {
-	switch {
-	case isCreateEvent(e.Op) || isWriteEvent(e.Op):
-		runSuiteFromFile(e.Name)
-	}
 }
 
 func runSuiteFromFile(path string) {
@@ -91,7 +95,7 @@ func runSuiteFromFile(path string) {
 
 func fsWatchErrorLoop(errc <-chan error) error {
 	for err := range errc {
-		// Those errors might be fatal, so maybe its would
+		// Those errors might be fatal, so maybe it would
 		// be better to return the first error encountered instead
 		// of just logging it.
 		log.Error("inotify watcher error", zap.Error(err))
@@ -99,10 +103,6 @@ func fsWatchErrorLoop(errc <-chan error) error {
 	return errFSErrorsChClosed
 }
 
-func isCreateEvent(o fsnotify.Op) bool {
-	return o&fsnotify.Create == fsnotify.Create
-}
-
-func isWriteEvent(o fsnotify.Op) bool {
-	return o&fsnotify.Write == fsnotify.Write
+func isValidEvent(o fsnotify.Op) bool {
+	return o&fsnotify.Create == fsnotify.Create || o&fsnotify.Write == fsnotify.Write
 }

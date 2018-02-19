@@ -21,6 +21,17 @@ const (
 	errorExitCode   = 1
 )
 
+const fileHelp = `
+
+For each operand that names a file of type directory,
+all the files with the extension .suite.json in the directory will be used as test suites.
+
+For each operand that names a file of a type other than directory,
+the file will be used as a test suite.
+
+If no operands are given, the current directory is used.
+`
+
 type command interface {
 	Name() string           // "foobar"
 	Args() string           // "<baz> [quux...]"
