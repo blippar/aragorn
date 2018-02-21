@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/oauth2/clientcredentials"
@@ -30,6 +31,7 @@ type Base struct {
 	RetryCount int
 	RetryWait  int
 	Insecure   bool
+	Timeout    int
 }
 
 type Test struct {
@@ -39,10 +41,11 @@ type Test struct {
 }
 
 type Request struct {
-	URL    string // If set, will overwrite the base URL.
-	Path   string
-	Method string
-	Header Header
+	URL     string // If set, will overwrite the base URL.
+	Path    string
+	Method  string
+	Header  Header
+	Timeout int
 
 	// Only one of the three following must be set.
 	Body      interface{}
@@ -117,6 +120,14 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 	}
 	if set > 1 {
 		errs = append(errs, "- request: at most one of body, multipart or formData can be set at once")
+	}
+
+	if t.Request.Timeout > 0 {
+		test.timeout = time.Duration(t.Request.Timeout) * time.Second
+	} else if cfg.Base.Timeout > 0 {
+		test.timeout = time.Duration(cfg.Base.Timeout) * time.Second
+	} else {
+		test.timeout = defaultTimeout
 	}
 
 	if httpReq, err := t.Request.toHTTPRequest(cfg); err != nil {

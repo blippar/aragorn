@@ -17,6 +17,7 @@ import (
 const (
 	defaultRetryCount = 1
 	defaultRetryWait  = 1 * time.Second
+	defaultTimeout    = 30 * time.Second
 )
 
 var _ testsuite.Suite = (*Suite)(nil)
@@ -29,11 +30,13 @@ type Suite struct {
 
 	retryCount int
 	retryWait  time.Duration
+	timeout    time.Duration
 }
 
 type test struct {
-	name string
-	req  *http.Request // Raw HTTP request generated from the request description.
+	name    string
+	req     *http.Request // Raw HTTP request generated from the request description.
+	timeout time.Duration
 
 	statusCode int
 	header     Header
@@ -131,6 +134,8 @@ func (s *Suite) runTestWithRetry(ctx context.Context, t *test, l Logger) {
 }
 
 func (s *Suite) runTest(ctx context.Context, t *test, l Logger) error {
+	ctx, cancel := context.WithTimeout(ctx, t.timeout)
+	defer cancel()
 	req := t.cloneRequest()
 	req = req.WithContext(ctx)
 	resp, err := s.client.Do(req)

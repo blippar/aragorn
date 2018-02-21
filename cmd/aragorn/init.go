@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/blippar/aragorn/server"
 )
@@ -49,7 +50,7 @@ func (*initCommand) Run(args []string) error {
 	w.SetIndent("", "  ")
 	s := &server.SuiteConfig{
 		Type: typ,
-		Name: pkg + " test suite",
+		Name: strings.Title(pkg),
 	}
 	return w.Encode(s)
 }
