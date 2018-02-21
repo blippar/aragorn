@@ -16,7 +16,6 @@ const runHelp = `Schedule the test suites in the configuration file`
 
 type runCommand struct {
 	config   string
-	execOnly bool
 	failfast bool
 }
 
@@ -30,7 +29,6 @@ func (*runCommand) Hidden() bool      { return false }
 
 func (cmd *runCommand) Register(fs *flag.FlagSet) {
 	fs.StringVar(&cmd.config, "config", "config.json", "Path to your config file")
-	fs.BoolVar(&cmd.execOnly, "exec-only", false, "Execute the test suites without scheduling")
 	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
 }
 
@@ -39,15 +37,11 @@ func (cmd *runCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	if cmd.execOnly {
-		srv.Exec()
-	} else {
-		if err := srv.Start(); err != nil {
-			return err
-		}
-		handleSignals()
-		srv.Stop()
+	if err := srv.Start(); err != nil {
+		return err
 	}
+	handleSignals()
+	srv.Stop()
 	return nil
 }
 

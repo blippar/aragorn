@@ -44,7 +44,7 @@ func NewConfigFromFile(path string) (*Config, error) {
 	return NewConfigFromReader(f)
 }
 
-func (cfg *Config) GenSuites(failfast bool) ([]*Suite, error) {
+func (cfg *Config) Notifier() notifier.Notifier {
 	var notifiers []notifier.Notifier
 	for id, ncfg := range cfg.Notifiers {
 		n, err := genNotifierPlugin(id, ncfg)
@@ -55,12 +55,15 @@ func (cfg *Config) GenSuites(failfast bool) ([]*Suite, error) {
 		notifiers = append(notifiers, n.(notifier.Notifier))
 	}
 	if cfg.ConsoleLog || len(notifiers) == 0 {
-		notifiers = append(notifiers, logNotifier)
+		notifiers = append(notifiers, notifier.NewLogNotifier())
 	}
-	n := notifier.Multi(notifiers...)
+	return notifier.Multi(notifiers...)
+}
+
+func (cfg *Config) GenSuites(failfast bool) ([]*Suite, error) {
 	suites := make([]*Suite, len(cfg.Suites))
 	for i, scfg := range cfg.Suites {
-		suite, err := NewSuiteFromSuiteConfig(scfg, failfast, n)
+		suite, err := scfg.GenSuite(failfast)
 		if err != nil {
 			return nil, err
 		}

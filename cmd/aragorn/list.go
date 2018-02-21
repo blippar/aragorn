@@ -30,7 +30,7 @@ func (*listCommand) Run(args []string) error {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "Path\tSuite\tType\tTest\tDescription")
 	for _, s := range suites {
-		tests := s.Suite.Tests()
+		tests := s.Tests()
 		for _, t := range tests {
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", s.Path(), s.Name(), s.Type(), t.Name(), t.Description())
 		}

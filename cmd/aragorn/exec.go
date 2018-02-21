@@ -7,9 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.uber.org/zap"
-
-	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/server"
 )
 
@@ -17,6 +14,7 @@ const execShortHelp = `Execute the test suites`
 const execLongHelp = `Execute the test suites` + fileHelp
 
 type execCommand struct {
+	config   string
 	failfast bool
 }
 
@@ -29,19 +27,27 @@ func (*execCommand) LongHelp() string  { return execLongHelp }
 func (*execCommand) Hidden() bool      { return false }
 
 func (cmd *execCommand) Register(fs *flag.FlagSet) {
+	fs.StringVar(&cmd.config, "config", "", "Path to your config file")
 	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
 }
 
 func (cmd *execCommand) Run(args []string) error {
+	if cmd.config != "" {
+		srv, err := server.New(cmd.config, cmd.failfast)
+		if err != nil {
+			return err
+		}
+		return srv.Exec()
+	}
 	suites, err := getSuitesFromArgs(args, cmd.failfast)
 	if err != nil {
 		return err
 	}
-	for _, s := range suites {
-		log.Info("running test suite", zap.String("file", s.Path()), zap.String("suite", s.Name()), zap.String("type", s.Type()))
-		s.Run()
+	srv := &server.Server{
+		Suites:   suites,
+		Notifier: logNotifier,
 	}
-	return nil
+	return srv.Exec()
 }
 
 func getSuitesFromArgs(args []string, failfast bool) ([]*server.Suite, error) {
@@ -53,7 +59,7 @@ func getSuitesFromArgs(args []string, failfast bool) ([]*server.Suite, error) {
 		if err != nil {
 			return err
 		}
-		if !strings.HasSuffix(path, server.TestSuiteJSONSuffix) {
+		if !strings.HasSuffix(path, testSuiteJSONSuffix) {
 			return nil
 		}
 		paths = append(paths, path)

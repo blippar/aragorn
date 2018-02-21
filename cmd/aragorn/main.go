@@ -10,11 +10,14 @@ import (
 	"text/tabwriter"
 
 	"github.com/blippar/aragorn/log"
+	"github.com/blippar/aragorn/notifier"
 
 	_ "github.com/blippar/aragorn/notifier/slack"
 	_ "github.com/blippar/aragorn/testsuite/grpcexpect"
 	_ "github.com/blippar/aragorn/testsuite/httpexpect"
 )
+
+const testSuiteJSONSuffix = ".suite.json"
 
 const (
 	successExitCode = 0
@@ -31,6 +34,8 @@ the file will be used as a test suite.
 
 If no operands are given, the current directory is used.
 `
+
+var logNotifier = notifier.NewLogNotifier()
 
 type command interface {
 	Name() string           // "foobar"

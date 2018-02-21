@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/blippar/aragorn/server"
 )
@@ -32,8 +32,8 @@ func (*initCommand) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	pkg := path.Base(dir)
-	f, err := os.Create(".aragorn/" + pkg + ".suite.json")
+	pkg := filepath.Base(dir)
+	f, err := os.Create(".aragorn/" + pkg + testSuiteJSONSuffix)
 	if err != nil {
 		return err
 	}

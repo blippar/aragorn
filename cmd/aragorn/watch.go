@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -64,8 +65,8 @@ func (cmd *watchCommand) Run(args []string) error {
 		}
 	}
 	errCh := make(chan error, 2)
-	go func() { errCh <- fsWatchEventLoop(fsw.Events, argFiles) }()
-	go func() { errCh <- fsWatchErrorLoop(fsw.Errors) }()
+	go func() { errCh <- cmd.fsWatchEventLoop(fsw.Events, argFiles) }()
+	go func() { errCh <- cmd.fsWatchErrorLoop(fsw.Errors) }()
 	select {
 	case err := <-errCh:
 		log.Error("server stopping after fatal error", zap.Error(err))
@@ -73,27 +74,28 @@ func (cmd *watchCommand) Run(args []string) error {
 	return nil
 }
 
-func fsWatchEventLoop(events <-chan fsnotify.Event, argFiles map[string]bool) error {
+func (cmd *watchCommand) fsWatchEventLoop(events <-chan fsnotify.Event, argFiles map[string]bool) error {
 	for e := range events {
 		log.Debug("watch event", zap.String("file", e.Name), zap.String("op", e.Op.String()))
-		if isValidEvent(e.Op) && (strings.HasSuffix(e.Name, server.TestSuiteJSONSuffix) || argFiles[e.Name]) {
-			runSuiteFromFile(e.Name)
+		if cmd.isValidEvent(e.Op) && (strings.HasSuffix(e.Name, testSuiteJSONSuffix) || argFiles[e.Name]) {
+			cmd.runSuiteFromFile(e.Name)
 		}
 	}
 	return errFSEventsChClosed
 }
 
-func runSuiteFromFile(path string) {
-	s, err := server.NewSuiteFromFile(path, false)
+func (cmd *watchCommand) runSuiteFromFile(path string) {
+	ctx := context.Background()
+	s, err := server.NewSuiteFromFile(path, cmd.failfast)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v", path, err)
 		return
 	}
 	log.Info("running test suite", zap.String("file", s.Path()), zap.String("suite", s.Name()), zap.String("type", s.Type()))
-	s.Run()
+	s.RunNotify(ctx, logNotifier)
 }
 
-func fsWatchErrorLoop(errc <-chan error) error {
+func (*watchCommand) fsWatchErrorLoop(errc <-chan error) error {
 	for err := range errc {
 		// Those errors might be fatal, so maybe it would
 		// be better to return the first error encountered instead
@@ -103,6 +105,6 @@ func fsWatchErrorLoop(errc <-chan error) error {
 	return errFSErrorsChClosed
 }
 
-func isValidEvent(o fsnotify.Op) bool {
+func (*watchCommand) isValidEvent(o fsnotify.Op) bool {
 	return o&fsnotify.Create == fsnotify.Create || o&fsnotify.Write == fsnotify.Write
 }
