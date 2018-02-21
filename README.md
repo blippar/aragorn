@@ -264,6 +264,7 @@ every 12h:
           "jsonValues": {
             "key": "value",
             "a.0": 1,
+            "a.length": 3,
             "b.c": "d"
           }
         }
