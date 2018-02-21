@@ -26,10 +26,11 @@ type Suite struct {
 	ts testsuite.Suite
 }
 
-func (s *Suite) Path() string   { return s.path }
-func (s *Suite) Name() string   { return s.name }
-func (s *Suite) Type() string   { return s.typ }
-func (s *Suite) FailFast() bool { return s.failfast }
+func (s *Suite) Path() string            { return s.path }
+func (s *Suite) Name() string            { return s.name }
+func (s *Suite) Type() string            { return s.typ }
+func (s *Suite) FailFast() bool          { return s.failfast }
+func (s *Suite) Tests() []testsuite.Test { return s.ts.Tests() }
 
 type SuiteConfig struct {
 	Path     string          `json:"path,omitempty"`     // only used in base config.
@@ -125,8 +126,6 @@ func (s *Suite) RunNotify(ctx context.Context, n notifier.Notifier) *notifier.Re
 	n.Notify(report)
 	return report
 }
-
-func (s *Suite) Tests() []testsuite.Test { return s.ts.Tests() }
 
 type suiteRunner struct {
 	s *Suite

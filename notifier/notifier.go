@@ -20,13 +20,14 @@ type Suite interface {
 	Name() string
 	Type() string
 	FailFast() bool
+	Tests() []testsuite.Test
 }
 
 type Report struct {
-	Suite    Suite
-	Start    time.Time
-	Duration time.Duration
-	Tests    []*TestReport
+	Suite       Suite
+	Start       time.Time
+	Duration    time.Duration
+	TestReports []*TestReport
 }
 
 func NewReport(s Suite) *Report {
@@ -42,7 +43,7 @@ func (r *Report) AddTest(t testsuite.Test) testsuite.TestReport {
 		Test:  t,
 		Start: time.Now(),
 	}
-	r.Tests = append(r.Tests, tr)
+	r.TestReports = append(r.TestReports, tr)
 	return tr
 }
 

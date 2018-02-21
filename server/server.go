@@ -65,7 +65,7 @@ func (s *Server) Exec() error {
 		log.Info("running test suite", zap.String("file", suite.Path()), zap.String("suite", suite.Name()), zap.String("type", suite.Type()))
 		report := suite.RunNotify(ctx, s.Notifier)
 		if ok {
-			for _, tr := range report.Tests {
+			for _, tr := range report.TestReports {
 				if len(tr.Errs) > 0 {
 					ok = false
 					if s.Failfast {

@@ -77,7 +77,7 @@ func NewFromConfig(cfg *Config) *Notifier {
 // Notify send a slack notification with the provided report.
 func (sn *Notifier) Notify(r *notifier.Report) {
 	errors := 0
-	for _, tr := range r.Tests {
+	for _, tr := range r.TestReports {
 		errors += len(tr.Errs)
 	}
 	extra := ""
@@ -99,7 +99,7 @@ func (sn *Notifier) Notify(r *notifier.Report) {
 		Channel:  sn.cfg.Channel,
 		Text:     fmt.Sprintf("*%s* - %s", r.Suite.Name(), extra),
 	}
-	for _, tr := range r.Tests {
+	for _, tr := range r.TestReports {
 		color := dangerColor
 		status := " failed"
 		if len(tr.Errs) == 0 {
