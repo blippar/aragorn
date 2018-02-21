@@ -160,7 +160,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | jsonSchema | `Object`            | Expected JSON schema (1) to be returned.     |
 | jsonValues | `Object`            | Specific JSON values to be returned.         |
 
-1. See [json-schema.org](http://json-schema.org/) for more info.
+1. See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
 
 #### Document
 
