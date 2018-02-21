@@ -10,7 +10,7 @@ import (
 	"github.com/blippar/aragorn/server"
 )
 
-const initHelp = `Creates all required files to setup Aragorn for a repository`
+const initHelp = `Set up a new Aragorn project`
 
 type initCommand struct{}
 
@@ -25,7 +25,6 @@ func (*initCommand) Hidden() bool      { return false }
 func (*initCommand) Register(fs *flag.FlagSet) {}
 
 func (*initCommand) Run(args []string) error {
-	s := &server.SuiteConfig{Type: "HTTP"}
 	if err := os.Mkdir(".aragorn", 0777); err != nil {
 		return err
 	}
@@ -34,17 +33,23 @@ func (*initCommand) Run(args []string) error {
 		return err
 	}
 	pkg := path.Base(dir)
-	file, err := os.Create(".aragorn/" + pkg + ".suite.json")
+	f, err := os.Create(".aragorn/" + pkg + ".suite.json")
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	s.Name = pkg + " test suite"
+	defer f.Close()
+	typ := "HTTP"
 	if len(args) > 0 && args[0] != "" {
 		if args[0] != "HTTP" && args[0] != "GRPC" {
 			return fmt.Errorf("%q is not a valid test suite type", args[0])
 		}
-		s.Type = args[0]
+		typ = args[0]
 	}
-	return json.NewEncoder(file).Encode(s)
+	w := json.NewEncoder(f)
+	w.SetIndent("", "  ")
+	s := &server.SuiteConfig{
+		Type: typ,
+		Name: pkg + " test suite",
+	}
+	return w.Encode(s)
 }

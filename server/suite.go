@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,28 +17,28 @@ import (
 type Suite struct {
 	path     string
 	name     string
-	suite    testsuite.Suite
+	Suite    testsuite.Suite
 	notifier notifier.Notifier
 	typ      string
 	runCron  string
 	runEvery time.Duration
 	failfast bool
+	ctx      context.Context
 }
 
-func (s *Suite) Path() string { return s.path }
-func (s *Suite) Name() string { return s.name }
-func (s *Suite) Type() string { return s.typ }
+func (s *Suite) Path() string   { return s.path }
+func (s *Suite) Name() string   { return s.name }
+func (s *Suite) Type() string   { return s.typ }
+func (s *Suite) FailFast() bool { return s.failfast }
 
 type SuiteConfig struct {
-	Path     string
-	Name     string // identifier for this test suite.
-	RunEvery duration
-	RunCron  string // cron string
-	FailFast bool   // stop after first test failure
-	// Type of the test suite, can be HTTP or GRPC.
-	Type string
-	// Description of the test suite, depends on Type.
-	Suite json.RawMessage
+	Path     string          `json:"path,omitempty"`     // only used in base config.
+	Name     string          `json:"name,omitempty"`     // identifier for this test suite
+	RunEvery duration        `json:"runEvery,omitempty"` // scheduling every duration.
+	RunCron  string          `json:"runCron,omitempty"`  // cron string.
+	FailFast bool            `json:"failFast,omitempty"` // stop after first test failure.
+	Type     string          `json:"type,omitempty"`     // type of the test suite, can be HTTP, GRPC...
+	Suite    json.RawMessage `json:"suite,omitempty"`    // description of the test suite, depends on Type.
 }
 
 func NewSuiteFromReader(r io.Reader, failfast bool, baseCfg *SuiteConfig) (*Suite, error) {
@@ -69,7 +70,7 @@ func NewSuiteFromReader(r io.Reader, failfast bool, baseCfg *SuiteConfig) (*Suit
 	}
 	s := &Suite{
 		path:     path,
-		suite:    suite.(testsuite.Suite),
+		Suite:    suite.(testsuite.Suite),
 		notifier: logNotifier,
 		failfast: failfast,
 		typ:      cfg.Type,
@@ -78,6 +79,8 @@ func NewSuiteFromReader(r io.Reader, failfast bool, baseCfg *SuiteConfig) (*Suit
 	if baseCfg != nil {
 		s.fromConfig(baseCfg)
 	}
+	ctx := context.Background()
+	s.ctx = testsuite.NewContextWithRPCInfo(ctx, s.failfast)
 	return s, nil
 }
 
@@ -118,8 +121,8 @@ func (s *Suite) fromConfig(cfg *SuiteConfig) {
 }
 
 func (s *Suite) Run() {
-	report := notifier.NewReport(s.name, s.failfast)
-	s.suite.Run(report)
+	report := notifier.NewReport(s)
+	s.Suite.Run(s.ctx, report)
 	report.Done()
 	s.notifier.Notify(report)
 }

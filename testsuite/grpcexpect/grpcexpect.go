@@ -1,12 +1,15 @@
 package grpcexpect
 
 import (
+	"context"
 	"errors"
 
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
+
+var _ testsuite.Suite = (*Suite)(nil)
 
 // Suite describes a GRPC test suite.
 type Suite struct{}
@@ -17,8 +20,12 @@ func New() (*Suite, error) {
 }
 
 // Run runs all the tests in the suite.
-func (s *Suite) Run(r testsuite.Report) {
+func (s *Suite) Run(ctx context.Context, r testsuite.Report) {
 	log.Error("not implemented")
+}
+
+func (s *Suite) Tests() []testsuite.Test {
+	return nil
 }
 
 func init() {

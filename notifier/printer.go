@@ -17,8 +17,8 @@ func NewLogNotifier() Notifier {
 func (*printer) Notify(r *Report) {
 	for _, tr := range r.Tests {
 		fields := []zapcore.Field{
-			zap.String("suite", r.Name),
-			zap.String("name", tr.Name),
+			zap.String("suite", r.Suite.Name()),
+			zap.String("name", tr.Test.Name()),
 			zap.Time("started_at", tr.Start),
 			zap.Duration("duration", tr.Duration),
 		}
@@ -30,10 +30,10 @@ func (*printer) Notify(r *Report) {
 		}
 	}
 	log.Info("test suite done",
-		zap.String("suite", r.Name),
+		zap.String("suite", r.Suite.Name()),
 		zap.Time("started_at", r.Start),
 		zap.Duration("duration", r.Duration),
 		zap.Int("nb_tests", len(r.Tests)),
-		zap.Bool("failfast", r.failfast),
+		zap.Bool("failfast", r.Suite.FailFast()),
 	)
 }

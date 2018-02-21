@@ -2,6 +2,7 @@ package httpexpect
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -291,8 +292,9 @@ func TestSuiteRunTestSimple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create suite: %v", err)
 	}
+	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(suite.tests[0], tr); err != nil {
+	if err := suite.runTest(ctx, suite.tests[0], tr); err != nil {
 		t.Fatalf("run test failed: %v", err)
 	}
 	if len(tr.errs) > 0 {
@@ -337,8 +339,9 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create suite: %v", err)
 	}
+	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(suite.tests[0], tr); err != nil {
+	if err := suite.runTest(ctx, suite.tests[0], tr); err != nil {
 		t.Fatalf("run test failed: %v", err)
 	}
 	if len(tr.errs) > 0 {

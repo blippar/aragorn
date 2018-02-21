@@ -49,12 +49,12 @@ func main() {
 func run() int {
 	// Build the list of available commands.
 	commands := [...]command{
-		&runCommand{},
+		&initCommand{},
+		&listCommand{},
 		&execCommand{},
 		&watchCommand{},
-		&listCommand{},
+		&runCommand{},
 		&versionCommand{},
-		&initCommand{},
 	}
 
 	usage := func(w io.Writer) {
