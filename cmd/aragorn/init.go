@@ -34,7 +34,8 @@ func (*initCommand) Run(args []string) error {
 		return err
 	}
 	pkg := filepath.Base(dir)
-	f, err := os.Create(".aragorn/" + pkg + testSuiteJSONSuffix)
+	path := filepath.Join(".aragorn", pkg+testSuiteJSONSuffix)
+	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
