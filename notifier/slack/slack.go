@@ -52,10 +52,10 @@ type Notifier struct {
 }
 
 type Config struct {
-	Webhook  string
-	Username string
-	Channel  string
-	Verbose  bool
+	Webhook  string `json:"webhook,omitempty"`
+	Username string `json:"username,omitempty"`
+	Channel  string `json:"channel,omitempty"`
+	Verbose  bool   `json:"verbose,omitempty"`
 }
 
 // New returns a new Notifier given a Slack webhook and a test suite name.
@@ -77,7 +77,7 @@ func NewFromConfig(cfg *Config) *Notifier {
 // Notify send a slack notification with the provided report.
 func (sn *Notifier) Notify(r *notifier.Report) {
 	errors := 0
-	for _, tr := range r.Tests {
+	for _, tr := range r.TestReports {
 		errors += len(tr.Errs)
 	}
 	extra := ""
@@ -91,15 +91,15 @@ func (sn *Notifier) Notify(r *notifier.Report) {
 	} else {
 		extra = fmt.Sprintf("%d tests failed", errors)
 	}
-	if r.FailFast() {
+	if r.Suite.FailFast() {
 		extra += " (fail fast)"
 	}
 	notif := &notification{
 		Username: sn.cfg.Username,
 		Channel:  sn.cfg.Channel,
-		Text:     fmt.Sprintf("*%s* - %s", r.Name, extra),
+		Text:     fmt.Sprintf("*%s* - %s", r.Suite.Name(), extra),
 	}
-	for _, tr := range r.Tests {
+	for _, tr := range r.TestReports {
 		color := dangerColor
 		status := " failed"
 		if len(tr.Errs) == 0 {
@@ -109,13 +109,17 @@ func (sn *Notifier) Notify(r *notifier.Report) {
 			status = ""
 			color = infoColor
 		}
-		title := fmt.Sprintf("Test %q%s", tr.Name, status)
+		title := fmt.Sprintf("Test %q%s", tr.Test.Name(), status)
 		a := attachment{
 			MrkdwnIn: []string{"fields"},
 			Fallback: title,
 			Color:    color,
 			Title:    title,
 			Fields: []attachmentField{
+				{
+					Title: "Description",
+					Value: tr.Test.Description(),
+				},
 				{
 					Title: "Duration",
 					Value: tr.Duration.String(),

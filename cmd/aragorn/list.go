@@ -28,9 +28,12 @@ func (*listCommand) Run(args []string) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "Path\tName\tType")
+	fmt.Fprintln(tw, "Path\tSuite\tType\tTest\tDescription")
 	for _, s := range suites {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", s.Path(), s.Name(), s.Type())
+		tests := s.Tests()
+		for _, t := range tests {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", s.Path(), s.Name(), s.Type(), t.Name(), t.Description())
+		}
 	}
 	tw.Flush()
 	return nil

@@ -125,6 +125,7 @@ An HTTP test suite contains a base configuration and list of tests.
 | oauth2     | `OAUTH2Config`      | Describes a 2-legged OAuth2 flow.                                                                                              |
 | retryCount | `int`               | Number of time the HTTP request can be retry. (default 1)                                                                      |
 | retryWait  | `int`               | Duration between each retry in second. (default 1s)                                                                            |
+| timeout    | `int`               | Timeout specifies a time limit for each request in second. (default 30s)                                                       |
 | insecure   | `bool`              | Insecure controls whether a client verifies the server's certificate chain and host name.                                      |
 
 #### OAUTH2Config
@@ -149,6 +150,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | multipart | `map[string]string` | Multipart content of the request. Values started with a `@` are files.  |
 | formData  | `map[string]string` | Form data as application/x-url-encoded format.                          |
 | body      | `Document`          | Request body.                                                           |
+| timeout   | `int`               | Timeout specifies a time limit for the request in second. (default 30s) |
 
 #### HTTPExpect
 
@@ -160,7 +162,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | jsonSchema | `Object`            | Expected JSON schema (1) to be returned.     |
 | jsonValues | `Object`            | Specific JSON values to be returned.         |
 
-1. See [json-schema.org](http://json-schema.org/) for more info.
+1. See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
 
 #### Document
 
@@ -262,6 +264,7 @@ every 12h:
           "jsonValues": {
             "key": "value",
             "a.0": 1,
+            "a.length": 3,
             "b.c": "d"
           }
         }

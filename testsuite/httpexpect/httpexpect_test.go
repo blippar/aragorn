@@ -2,6 +2,7 @@ package httpexpect
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -291,8 +293,9 @@ func TestSuiteRunTestSimple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create suite: %v", err)
 	}
+	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(suite.tests[0], tr); err != nil {
+	if err := suite.runTest(ctx, suite.tests[0], tr); err != nil {
 		t.Fatalf("run test failed: %v", err)
 	}
 	if len(tr.errs) > 0 {
@@ -337,8 +340,9 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create suite: %v", err)
 	}
+	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(suite.tests[0], tr); err != nil {
+	if err := suite.runTest(ctx, suite.tests[0], tr); err != nil {
 		t.Fatalf("run test failed: %v", err)
 	}
 	if len(tr.errs) > 0 {
@@ -346,6 +350,44 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	}
 }
 
+func TestSuiteRunTestTimeout(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(1200 * time.Millisecond)
+	}))
+	defer ts.Close()
+	cfg := &Config{
+		Path: "./testdata/",
+		Base: Base{
+			URL:     ts.URL,
+			Timeout: 1,
+		},
+		Tests: []*Test{
+			{
+				Name: "index",
+				Request: Request{
+					Body: userData,
+				},
+				Expect: Expect{
+					StatusCode: http.StatusOK,
+					Document:   userRef,
+					Header: Header{
+						"X-Custom-Header": "1",
+					},
+				},
+			},
+		},
+	}
+	suite, err := New(cfg)
+	if err != nil {
+		t.Fatalf("can't create suite: %v", err)
+	}
+	ctx := context.Background()
+	tr := &mockLogger{}
+	err = suite.runTest(ctx, suite.tests[0], tr)
+	if err == nil || strings.HasSuffix(context.DeadlineExceeded.Error(), err.Error()) {
+		t.Fatalf("run test invalid error returned (got %v; want %v)", err, context.DeadlineExceeded)
+	}
+}
 func TestQueryJSONData(t *testing.T) {
 	m := map[string]interface{}{
 		"hello": "world",
@@ -368,9 +410,11 @@ func TestQueryJSONData(t *testing.T) {
 		{"obj sub obj field a", m, "sub.a", "b", ""},
 		{"obj sub obj field not found", m, "sub.d", "", "sub.d: object does not contain field"},
 		{"obj sub arr", m, "arr.0", 42, ""},
+		{"obj sub arr length check", m, "arr.length", json.Number("3"), ""},
 		{"obj sub arr out of bounds", m, "arr.125", 42, "arr.125: array index out of bounds"},
 		{"arr simple int", arr, "0", 1, ""},
 		{"arr simple string", arr, "3", "test", ""},
+		{"arr simple length check", arr, "length", json.Number("6"), ""},
 		{"arr invalid index", arr, "invalid_index", nil, "invalid_index: invalid array index"},
 		{"arr out of bounds", arr, "1234", nil, "1234: array index out of bounds"},
 		{"arr sub obj field a", arr, "5.abc", "def", ""},
@@ -406,6 +450,7 @@ func TestLookupJSONData(t *testing.T) {
 		{"obj field not found", m, "invalid_key", errObjectFieldNotFound},
 		{"arr simple int", arr, "0", 1},
 		{"arr simple string", arr, "3", "test"},
+		{"arr simple length check", arr, "length", json.Number("5")},
 		{"arr invalid index", arr, "invalid_index", errInvalidArrayIndex},
 		{"arr out of bounds", arr, "1234", errIndexOutOfBounds},
 		{"invalid type", nil, "key", errInvalidType},

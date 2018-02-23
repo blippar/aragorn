@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 
 	"go.uber.org/zap"
@@ -10,15 +11,16 @@ import (
 	"github.com/blippar/aragorn/scheduler"
 )
 
-const TestSuiteJSONSuffix = ".suite.json"
-
-var errNoSchedulingRule = errors.New("no scheduling rule set in test suite file: please set runCron or runEvery")
-
-var logNotifier = notifier.NewLogNotifier()
+var (
+	errNoSchedulingRule   = errors.New("no scheduling rule set for test suite: please set runCron or runEvery")
+	errSomethingWentWrong = errors.New("something went wrong")
+)
 
 type Server struct {
-	sch    *scheduler.Scheduler
-	suites []*Suite
+	sch      *scheduler.Scheduler
+	Suites   []*Suite
+	Notifier notifier.Notifier
+	Failfast bool
 }
 
 func New(cfgPath string, failfast bool) (*Server, error) {
@@ -31,13 +33,15 @@ func New(cfgPath string, failfast bool) (*Server, error) {
 		return nil, err
 	}
 	return &Server{
-		suites: suites,
+		Suites:   suites,
+		Notifier: cfg.Notifier(),
+		Failfast: failfast,
 	}, nil
 }
 
 func (s *Server) Start() error {
 	s.sch = scheduler.New()
-	for _, suite := range s.suites {
+	for _, suite := range s.Suites {
 		if err := s.scheduleSuite(suite); err != nil {
 			log.Error("test suite scheduling", zap.String("file", suite.Path()), zap.Error(err))
 		} else {
@@ -54,18 +58,39 @@ func (s *Server) Stop() {
 	}
 }
 
-func (s *Server) Exec() {
-	for _, suite := range s.suites {
+func (s *Server) Exec() error {
+	ctx := context.Background()
+	ok := true
+	for _, suite := range s.Suites {
 		log.Info("running test suite", zap.String("file", suite.Path()), zap.String("suite", suite.Name()), zap.String("type", suite.Type()))
-		suite.Run()
+		report := suite.RunNotify(ctx, s.Notifier)
+		if ok {
+			for _, tr := range report.TestReports {
+				if len(tr.Errs) > 0 {
+					ok = false
+					if s.Failfast {
+						return errSomethingWentWrong
+					}
+					break
+				}
+			}
+		}
 	}
+	if !ok {
+		return errSomethingWentWrong
+	}
+	return nil
 }
 
 func (s *Server) scheduleSuite(suite *Suite) error {
+	sr := &suiteRunner{
+		s: suite,
+		n: s.Notifier,
+	}
 	if suite.runCron != "" {
-		return s.sch.AddCron(suite.path, suite, suite.runCron)
+		return s.sch.AddCron(suite.path, sr, suite.runCron)
 	} else if suite.runEvery > 0 {
-		return s.sch.Add(suite.path, suite, suite.runEvery)
+		return s.sch.Add(suite.path, sr, suite.runEvery)
 	}
 	return errNoSchedulingRule
 }

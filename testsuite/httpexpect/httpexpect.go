@@ -17,7 +17,10 @@ import (
 const (
 	defaultRetryCount = 1
 	defaultRetryWait  = 1 * time.Second
+	defaultTimeout    = 30 * time.Second
 )
+
+var _ testsuite.Suite = (*Suite)(nil)
 
 // Suite describes an HTTP test suite.
 type Suite struct {
@@ -27,11 +30,13 @@ type Suite struct {
 
 	retryCount int
 	retryWait  time.Duration
+	timeout    time.Duration
 }
 
 type test struct {
-	name string
-	req  *http.Request // Raw HTTP request generated from the request description.
+	name    string
+	req     *http.Request // Raw HTTP request generated from the request description.
+	timeout time.Duration
 
 	statusCode int
 	header     Header
@@ -40,6 +45,9 @@ type test struct {
 	jsonSchema *gojsonschema.Schema   // Compiled jsonschema.
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
+
+func (t *test) Name() string        { return t.name }
+func (t *test) Description() string { return t.req.Method + " " + t.req.URL.String() }
 
 // New returns a Suite.
 func New(cfg *Config) (*Suite, error) {
@@ -75,28 +83,40 @@ func New(cfg *Config) (*Suite, error) {
 }
 
 // Run runs all the tests in the suite.
-func (s *Suite) Run(r testsuite.Report) {
+func (s *Suite) Run(ctx context.Context, r testsuite.Report) {
+	failfast := false
+	if rpcInfo, ok := testsuite.RPCInfoFromContext(ctx); ok {
+		failfast = rpcInfo.FailFast
+	}
 	for _, t := range s.tests {
-		tr := r.AddTest(t.name)
-		s.runTestWithRetry(t, tr)
-		if tr.Done() {
+		tr := r.AddTest(t)
+		s.runTestWithRetry(ctx, t, tr)
+		if tr.Done() && failfast {
 			return
 		}
 	}
 }
 
+func (s *Suite) Tests() []testsuite.Test {
+	tests := make([]testsuite.Test, len(s.tests))
+	for i, t := range s.tests {
+		tests[i] = t
+	}
+	return tests
+}
+
 // runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
 // in between each try. It returns the error of the last tentative if none is sucessful,
 // nil otherwise.
-func (s *Suite) runTestWithRetry(t *test, l Logger) {
+func (s *Suite) runTestWithRetry(ctx context.Context, t *test, l Logger) {
 	if s.retryCount == 1 {
-		if err := s.runTest(t, l); err != nil {
+		if err := s.runTest(ctx, t, l); err != nil {
 			l.Error(err)
 		}
 		return
 	}
 	for attempt := 1; ; attempt++ {
-		err := s.runTest(t, l)
+		err := s.runTest(ctx, t, l)
 		if err == nil {
 			return
 		}
@@ -104,12 +124,20 @@ func (s *Suite) runTestWithRetry(t *test, l Logger) {
 			l.Errorf("could not run test after %d attempts: %v", attempt, err)
 			return
 		}
-		time.Sleep(s.retryWait * time.Duration(attempt))
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			l.Errorf("could not run test after %d attempts: %v", attempt, err)
+		case <-time.After(s.retryWait):
+		}
 	}
 }
 
-func (s *Suite) runTest(t *test, l Logger) error {
+func (s *Suite) runTest(ctx context.Context, t *test, l Logger) error {
+	ctx, cancel := context.WithTimeout(ctx, t.timeout)
+	defer cancel()
 	req := t.cloneRequest()
+	req = req.WithContext(ctx)
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not do HTTP request: %v", err)

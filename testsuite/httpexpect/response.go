@@ -2,6 +2,7 @@ package httpexpect
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -165,6 +166,9 @@ func queryJSONData(q string, v interface{}) (interface{}, error) {
 func lookupJSONData(k string, i interface{}) (interface{}, error) {
 	switch v := i.(type) {
 	case []interface{}:
+		if k == "length" {
+			return json.Number(strconv.Itoa(len(v))), nil
+		}
 		i, err := strconv.Atoi(k)
 		if err != nil {
 			return nil, errInvalidArrayIndex
