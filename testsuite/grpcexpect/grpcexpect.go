@@ -1,10 +1,8 @@
 package grpcexpect
 
 import (
-	"context"
 	"errors"
 
-	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
@@ -17,11 +15,6 @@ type Suite struct{}
 // New returns a Suite.
 func New() (*Suite, error) {
 	return nil, errors.New("Not implemented")
-}
-
-// Run runs all the tests in the suite.
-func (s *Suite) Run(ctx context.Context, r testsuite.Report) {
-	log.Error("not implemented")
 }
 
 func (s *Suite) Tests() []testsuite.Test {

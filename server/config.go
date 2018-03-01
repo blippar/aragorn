@@ -19,16 +19,12 @@ import (
 )
 
 type Config struct {
-	Notifiers  map[string]json.RawMessage
-	Suites     []*SuiteConfig
-	ConsoleLog bool
-	// StartupDelay duration
+	Notifiers map[string]json.RawMessage
+	Suites    []*SuiteConfig
 }
 
 func NewConfigFromReader(r io.Reader) (*Config, error) {
-	cfg := &Config{
-		ConsoleLog: true,
-	}
+	cfg := &Config{}
 	if err := decodeReaderJSON(r, cfg); err != nil {
 		return nil, fmt.Errorf("could not decode config: %v", jsonDecodeError(r, err))
 	}
@@ -54,8 +50,11 @@ func (cfg *Config) Notifier() notifier.Notifier {
 		}
 		notifiers = append(notifiers, n.(notifier.Notifier))
 	}
-	if cfg.ConsoleLog || len(notifiers) == 0 {
-		notifiers = append(notifiers, notifier.NewLogNotifier())
+	switch len(notifiers) {
+	case 0:
+		return nil
+	case 1:
+		return notifiers[0]
 	}
 	return notifier.Multi(notifiers...)
 }

@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -28,6 +25,7 @@ type Report struct {
 	Start       time.Time
 	Duration    time.Duration
 	TestReports []*TestReport
+	NbFailed    int
 }
 
 func NewReport(s Suite) *Report {
@@ -37,8 +35,7 @@ func NewReport(s Suite) *Report {
 	}
 }
 
-func (r *Report) AddTest(t testsuite.Test) testsuite.TestReport {
-	log.Debug("running test", zap.String("name", t.Name()), zap.String("description", t.Description()))
+func (r *Report) NewTestReport(t testsuite.Test) *TestReport {
 	tr := &TestReport{
 		Test:  t,
 		Start: time.Now(),
@@ -66,7 +63,6 @@ func (tr *TestReport) Errorf(format string, args ...interface{}) {
 	tr.Errs = append(tr.Errs, fmt.Errorf(format, args...))
 }
 
-func (tr *TestReport) Done() bool {
+func (tr *TestReport) Done() {
 	tr.Duration = time.Since(tr.Start)
-	return len(tr.Errs) > 0
 }

@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/blippar/aragorn/testsuite"
 )
 
 const maxErrorBodySize = 512
@@ -21,16 +23,10 @@ var (
 	errInvalidType         = errors.New("invalid type")
 )
 
-// Logger logs error.
-type Logger interface {
-	Error(args ...interface{})
-	Errorf(format string, args ...interface{})
-}
-
 // response wraps an http.Response and allows you to have expectations on it.
 type response struct {
 	test          *test
-	logger        Logger
+	logger        testsuite.Logger
 	resp          *http.Response
 	body          []byte
 	dataJSON      interface{}
@@ -39,7 +35,7 @@ type response struct {
 
 // checkResponse checks a response on which you can have expectations.
 // Any failed expectation will be logged on the logger.
-func checkResponse(test *test, logger Logger, resp *http.Response, body []byte) {
+func checkResponse(test *test, logger testsuite.Logger, resp *http.Response, body []byte) {
 	if resp.StatusCode != test.statusCode {
 		str := string(body)
 		if len(str) > maxErrorBodySize {

@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -295,9 +294,7 @@ func TestSuiteRunTestSimple(t *testing.T) {
 	}
 	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(ctx, suite.tests[0], tr); err != nil {
-		t.Fatalf("run test failed: %v", err)
-	}
+	suite.tests[0].Run(ctx, tr)
 	if len(tr.errs) > 0 {
 		t.Fatalf("unexpected test report errors: %v", tr.errs)
 	}
@@ -342,52 +339,12 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	}
 	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(ctx, suite.tests[0], tr); err != nil {
-		t.Fatalf("run test failed: %v", err)
-	}
+	suite.tests[0].Run(ctx, tr)
 	if len(tr.errs) > 0 {
 		t.Fatalf("unexpected test report errors: %v", tr.errs)
 	}
 }
 
-func TestSuiteRunTestTimeout(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(1200 * time.Millisecond)
-	}))
-	defer ts.Close()
-	cfg := &Config{
-		Path: "./testdata/",
-		Base: Base{
-			URL:     ts.URL,
-			Timeout: 1,
-		},
-		Tests: []*Test{
-			{
-				Name: "index",
-				Request: Request{
-					Body: userData,
-				},
-				Expect: Expect{
-					StatusCode: http.StatusOK,
-					Document:   userRef,
-					Header: Header{
-						"X-Custom-Header": "1",
-					},
-				},
-			},
-		},
-	}
-	suite, err := New(cfg)
-	if err != nil {
-		t.Fatalf("can't create suite: %v", err)
-	}
-	ctx := context.Background()
-	tr := &mockLogger{}
-	err = suite.runTest(ctx, suite.tests[0], tr)
-	if err == nil || strings.HasSuffix(context.DeadlineExceeded.Error(), err.Error()) {
-		t.Fatalf("run test invalid error returned (got %v; want %v)", err, context.DeadlineExceeded)
-	}
-}
 func TestQueryJSONData(t *testing.T) {
 	m := map[string]interface{}{
 		"hello": "world",

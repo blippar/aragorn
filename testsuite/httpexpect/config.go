@@ -12,10 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/oauth2/clientcredentials"
+
+	"github.com/blippar/aragorn/testsuite"
 )
 
 type Config struct {
@@ -25,13 +26,10 @@ type Config struct {
 }
 
 type Base struct {
-	URL        string // Base URL prepended to all requests' path.
-	Header     Header // Base set of headers added to all requests.
-	OAUTH2     clientcredentials.Config
-	RetryCount int
-	RetryWait  int
-	Insecure   bool
-	Timeout    int
+	URL      string // Base URL prepended to all requests' path.
+	Header   Header // Base set of headers added to all requests.
+	OAUTH2   clientcredentials.Config
+	Insecure bool
 }
 
 type Test struct {
@@ -73,7 +71,7 @@ func (h Header) addToRequest(req *http.Request) {
 
 // genTest verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
-func (cfg *Config) genTests() ([]*test, error) {
+func (cfg *Config) genTests(client *http.Client) ([]testsuite.Test, error) {
 	if cfg.Base.URL == "" {
 		return nil, errors.New("base: URL is required")
 	}
@@ -83,12 +81,12 @@ func (cfg *Config) genTests() ([]*test, error) {
 	if len(cfg.Tests) == 0 {
 		return nil, errors.New("a test suite must contain at least one test")
 	}
-	ts := make([]*test, len(cfg.Tests))
+	ts := make([]testsuite.Test, len(cfg.Tests))
 	var errs []string
-	for i, test := range cfg.Tests {
-		t, err := test.prepare(cfg)
+	for i, testcfg := range cfg.Tests {
+		t, err := testcfg.prepare(cfg, client)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("test %q:\n%v", test.Name, err))
+			errs = append(errs, fmt.Sprintf("test %q:\n%v", testcfg.Name, err))
 		}
 		ts[i] = t
 	}
@@ -98,9 +96,10 @@ func (cfg *Config) genTests() ([]*test, error) {
 	return ts, nil
 }
 
-func (t *Test) prepare(cfg *Config) (*test, error) {
+func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 	test := &test{
 		name:       t.Name,
+		client:     client,
 		statusCode: t.Expect.StatusCode,
 		header:     make(Header),
 	}
@@ -122,18 +121,11 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 		errs = append(errs, "- request: at most one of body, multipart or formData can be set at once")
 	}
 
-	if t.Request.Timeout > 0 {
-		test.timeout = time.Duration(t.Request.Timeout) * time.Second
-	} else if cfg.Base.Timeout > 0 {
-		test.timeout = time.Duration(cfg.Base.Timeout) * time.Second
-	} else {
-		test.timeout = defaultTimeout
-	}
-
 	if httpReq, err := t.Request.toHTTPRequest(cfg); err != nil {
 		errs = append(errs, fmt.Sprintf("- request: could not create HTTP request: %v", err))
 	} else {
 		test.req = httpReq
+		test.description = httpReq.Method + " " + httpReq.URL.String()
 	}
 
 	if test.statusCode == 0 {

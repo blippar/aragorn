@@ -35,11 +35,10 @@ The directories to watch can be specified via command line positional arguments
 The config is only used by the run command.
 It contains a list of suites to execute or schedule and the notifiers.
 
-| Name       | Type                     | Description                                          |
-| ---------- | ------------------------ | ---------------------------------------------------- |
-| notifiers  | `map[string]interface{}` | the notifiers configurations.                        |
-| suites     | `[]SuiteConfig`          | List of suites to load.                              |
-| consoleLog | `bool`                   | Log the suite reports on the console. (default true) |
+| Name      | Type                     | Description                   |
+| --------- | ------------------------ | ----------------------------- |
+| notifiers | `map[string]interface{}` | the notifiers configurations. |
+| suites    | `[]SuiteConfig`          | List of suites to load.       |
 
 Example:
 
@@ -63,8 +62,7 @@ Example:
         }
       }
     }
-  ],
-  "consoleLog": false
+  ]
 }
 ```
 
@@ -86,15 +84,18 @@ Example:
 A test suite describes a combination of tests to be run. It is composed of some
 configuration fields for the scheduling and notification handling. The tests are described in the suite field depending on the type field (`HTTP` or `GRPC`).
 
-| Name     | Type                       | Description                                                                                                                           |
-| -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| path     | `string`                   | Path to the `SuiteConfig` only used in `Config.suites`                                                                                |
-| name     | `string`                   | **REQUIRED**. The name of this suite.                                                                                                 |
-| type     | `string`                   | **REQUIRED**. `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                 |
-| runEvery | `string`                   | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
-| runCron  | `string`                   | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
-| failFast | `bool`                     | Stop after first test failure                                                                                                         |
-| suite    | `HTTPSuite` or `GRPCSuite` | **REQUIRED**. An object describing the test suite itself. Depends on the field `type`.                                                |
+| Name       | Type                       | Description                                                                                                                           |
+| ---------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| path       | `string`                   | Path to the `SuiteConfig` only used in `Config.suites`                                                                                |
+| name       | `string`                   | **REQUIRED**. The name of this suite.                                                                                                 |
+| type       | `string`                   | **REQUIRED**. `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                 |
+| runEvery   | `string`                   | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
+| runCron    | `string`                   | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
+| retryCount | `int`                      | Number of time a test can be retry, if any error happened. (default 1)                                                                |
+| retryWait  | `string`                   | Duration between each retry in second. (default 1s)                                                                                   |
+| timeout    | `string`                   | Timeout specifies a time limit for each test in second. (default 30s)                                                                 |
+| failFast   | `bool`                     | Stop after first test failure                                                                                                         |
+| suite      | `HTTPSuite` or `GRPCSuite` | **REQUIRED**. An object describing the test suite itself. Depends on the field `type`.                                                |
 
 Example:
 
@@ -118,15 +119,12 @@ An HTTP test suite contains a base configuration and list of tests.
 
 #### HTTPBase
 
-| Name       | Type                | Description                                                                                                                    |
-| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| url        | `string`            | **REQUIRED**. Base URL prepended to all `path` in each test request.                                                           |
-| header     | `map[string]string` | List of request header fields to add to every test in this suite. Each test can overwrite the header fields set at this level. |
-| oauth2     | `OAUTH2Config`      | Describes a 2-legged OAuth2 flow.                                                                                              |
-| retryCount | `int`               | Number of time the HTTP request can be retry. (default 1)                                                                      |
-| retryWait  | `int`               | Duration between each retry in second. (default 1s)                                                                            |
-| timeout    | `int`               | Timeout specifies a time limit for each request in second. (default 30s)                                                       |
-| insecure   | `bool`              | Insecure controls whether a client verifies the server's certificate chain and host name.                                      |
+| Name     | Type                | Description                                                                                                                    |
+| -------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| url      | `string`            | **REQUIRED**. Base URL prepended to all `path` in each test request.                                                           |
+| header   | `map[string]string` | List of request header fields to add to every test in this suite. Each test can overwrite the header fields set at this level. |
+| oauth2   | `OAUTH2Config`      | Describes a 2-legged OAuth2 flow.                                                                                              |
+| insecure | `bool`              | Insecure controls whether a client verifies the server's certificate chain and host name.                                      |
 
 #### OAUTH2Config
 
@@ -150,7 +148,6 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | multipart | `map[string]string` | Multipart content of the request. Values started with a `@` are files.  |
 | formData  | `map[string]string` | Form data as application/x-url-encoded format.                          |
 | body      | `Document`          | Request body.                                                           |
-| timeout   | `int`               | Timeout specifies a time limit for the request in second. (default 30s) |
 
 #### HTTPExpect
 
@@ -217,6 +214,9 @@ every 12h:
   "name": "Service 1 HTTP test suite",
   "type": "HTTP",
   "runEvery": "12h",
+  "retryCount": 3,
+  "retryWaint": "100ms",
+  "timeout": "10s",
   "suite": {
     "base": {
       "url": "http://localhost:8080",
@@ -273,3 +273,9 @@ every 12h:
   }
 }
 ```
+
+## Tracing
+
+This project use [OpenTracing](http://opentracing.io/), a vendor-neutral open standard for distributed tracing. When aragorn run a test suite it will create a span that will be propagated in the context, a sub span is created for each test. More details are filled by the test suite package that implement the execution of the test. For example, the http call in the `httpexpect` package is traced in a sub span.
+
+By default, the aragorn command will run with no tracer. You can set a tracer with the tracer flag. More info with `aragorn help exec`.

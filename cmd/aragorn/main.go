@@ -5,12 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"text/tabwriter"
 
+	"go.uber.org/zap"
+
 	"github.com/blippar/aragorn/log"
-	"github.com/blippar/aragorn/notifier"
 
 	_ "github.com/blippar/aragorn/notifier/slack"
 	_ "github.com/blippar/aragorn/testsuite/grpcexpect"
@@ -34,8 +36,6 @@ the file will be used as a test suite.
 
 If no operands are given, the current directory is used.
 `
-
-var logNotifier = notifier.NewLogNotifier()
 
 type command interface {
 	Name() string           // "foobar"
@@ -93,6 +93,9 @@ func run() int {
 			fs.SetOutput(os.Stderr)
 			debug := fs.Bool("debug", false, "Enable debug mode")
 			logLevel := fs.String("log-level", "info", `Set the logging level ("debug"|"info"|"warn"|"error"|"fatal")`)
+			httpLAddr := fs.String("http-laddr", "", "Set the http listen address")
+			tracer := fs.String("tracer", "", `Set the tracer ("basic"|"jaeger")`)
+			tracerAddr := fs.String("tracer-addr", "localhost:6831", "Set the tracer address")
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(fs)
@@ -117,6 +120,22 @@ func run() int {
 				return errorExitCode
 			}
 			defer log.L().Sync()
+
+			switch *tracer {
+			case "basic":
+				newBasicTracer()
+			case "jaeger":
+				defer newJaegerTracer(*tracerAddr).Close()
+			}
+
+			if *httpLAddr != "" {
+				go func() {
+					if err := http.ListenAndServe(*httpLAddr, nil); err != nil {
+						log.Error("http server failure", zap.Error(err))
+					}
+				}()
+			}
+
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(fs.Args()); err != nil {
 				fmt.Fprintln(os.Stderr, err)

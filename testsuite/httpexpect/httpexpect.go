@@ -3,40 +3,55 @@ package httpexpect
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
+	"github.com/opentracing-contrib/go-stdlib/nethttp"
+	ot "github.com/opentracing/opentracing-go"
 	"github.com/xeipuuv/gojsonschema"
+	"golang.org/x/oauth2"
 
 	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
-)
-
-const (
-	defaultRetryCount = 1
-	defaultRetryWait  = 1 * time.Second
-	defaultTimeout    = 30 * time.Second
 )
 
 var _ testsuite.Suite = (*Suite)(nil)
 
 // Suite describes an HTTP test suite.
 type Suite struct {
-	tests []*test
-
-	client *http.Client
-
-	retryCount int
-	retryWait  time.Duration
-	timeout    time.Duration
+	tests []testsuite.Test
 }
 
+// New returns a Suite.
+func New(cfg *Config) (*Suite, error) {
+	client := &http.Client{}
+	if cfg.Base.Insecure {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	}
+	client.Transport = &nethttp.Transport{RoundTripper: client.Transport}
+	if cfg.Base.OAUTH2.ClientID != "" && cfg.Base.OAUTH2.ClientSecret != "" {
+		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
+		client = cfg.Base.OAUTH2.Client(ctx)
+	}
+	tests, err := cfg.genTests(client)
+	if err != nil {
+		return nil, err
+	}
+	return &Suite{tests: tests}, nil
+}
+
+func (s *Suite) Tests() []testsuite.Test { return s.tests }
+
 type test struct {
-	name    string
-	req     *http.Request // Raw HTTP request generated from the request description.
-	timeout time.Duration
+	name        string
+	description string
+
+	client *http.Client
+	req    *http.Request // Raw HTTP request generated from the request description.
 
 	statusCode int
 	header     Header
@@ -47,108 +62,27 @@ type test struct {
 }
 
 func (t *test) Name() string        { return t.name }
-func (t *test) Description() string { return t.req.Method + " " + t.req.URL.String() }
+func (t *test) Description() string { return t.description }
 
-// New returns a Suite.
-func New(cfg *Config) (*Suite, error) {
-	tests, err := cfg.genTests()
+func (t *test) Run(ctx context.Context, l testsuite.Logger) {
+	req := t.cloneRequest().WithContext(ctx)
+
+	opName := "HTTP: " + t.Name()
+	req, ht := nethttp.TraceRequest(ot.GlobalTracer(), req, nethttp.OperationName(opName))
+	defer ht.Finish()
+
+	resp, err := t.client.Do(req)
 	if err != nil {
-		return nil, err
-	}
-	s := &Suite{
-		tests:      tests,
-		client:     http.DefaultClient,
-		retryCount: defaultRetryCount,
-		retryWait:  defaultRetryWait,
-	}
-	if cfg.Base.OAUTH2.ClientID != "" && cfg.Base.OAUTH2.ClientSecret != "" {
-		s.client = cfg.Base.OAUTH2.Client(context.Background())
-	}
-	if cfg.Base.RetryCount > 0 {
-		s.retryCount = cfg.Base.RetryCount
-	}
-	if cfg.Base.RetryWait > 0 {
-		s.retryWait = time.Duration(cfg.Base.RetryWait) * time.Second
-	}
-	if cfg.Base.Insecure {
-		s.client = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
-	return s, nil
-}
-
-// Run runs all the tests in the suite.
-func (s *Suite) Run(ctx context.Context, r testsuite.Report) {
-	failfast := false
-	if rpcInfo, ok := testsuite.RPCInfoFromContext(ctx); ok {
-		failfast = rpcInfo.FailFast
-	}
-	for _, t := range s.tests {
-		tr := r.AddTest(t)
-		s.runTestWithRetry(ctx, t, tr)
-		if tr.Done() && failfast {
-			return
-		}
-	}
-}
-
-func (s *Suite) Tests() []testsuite.Test {
-	tests := make([]testsuite.Test, len(s.tests))
-	for i, t := range s.tests {
-		tests[i] = t
-	}
-	return tests
-}
-
-// runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
-// in between each try. It returns the error of the last tentative if none is sucessful,
-// nil otherwise.
-func (s *Suite) runTestWithRetry(ctx context.Context, t *test, l Logger) {
-	if s.retryCount == 1 {
-		if err := s.runTest(ctx, t, l); err != nil {
-			l.Error(err)
-		}
+		l.Errorf("could not do HTTP request: %v", err)
 		return
-	}
-	for attempt := 1; ; attempt++ {
-		err := s.runTest(ctx, t, l)
-		if err == nil {
-			return
-		}
-		if attempt >= s.retryCount {
-			l.Errorf("could not run test after %d attempts: %v", attempt, err)
-			return
-		}
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			l.Errorf("could not run test after %d attempts: %v", attempt, err)
-		case <-time.After(s.retryWait):
-		}
-	}
-}
-
-func (s *Suite) runTest(ctx context.Context, t *test, l Logger) error {
-	ctx, cancel := context.WithTimeout(ctx, t.timeout)
-	defer cancel()
-	req := t.cloneRequest()
-	req = req.WithContext(ctx)
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("could not do HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("could not read body: %v", err)
+		l.Errorf("could not read body: %v", err)
+		return
 	}
 	checkResponse(t, l, resp, body)
-	return nil
 }
 
 // cloneRequest returns a clone of the provided *http.Request.
