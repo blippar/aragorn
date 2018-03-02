@@ -16,6 +16,7 @@ const execLongHelp = `Execute the test suites` + fileHelp
 type execCommand struct {
 	config   string
 	failfast bool
+	wait     bool
 }
 
 func (*execCommand) Name() string { return "exec" }
@@ -29,6 +30,7 @@ func (*execCommand) Hidden() bool      { return false }
 func (cmd *execCommand) Register(fs *flag.FlagSet) {
 	fs.StringVar(&cmd.config, "config", "", "Path to your config file")
 	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
+	fs.BoolVar(&cmd.wait, "wait", false, "Wait")
 }
 
 func (cmd *execCommand) Run(args []string) error {
@@ -44,10 +46,15 @@ func (cmd *execCommand) Run(args []string) error {
 		return err
 	}
 	srv := &server.Server{
-		Suites:   suites,
-		Notifier: logNotifier,
+		Suites: suites,
 	}
-	return srv.Exec()
+	err = srv.Exec()
+	if !cmd.wait {
+		return err
+	} else if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	select {}
 }
 
 func getSuitesFromArgs(args []string, failfast bool) ([]*server.Suite, error) {

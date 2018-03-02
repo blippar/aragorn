@@ -2,10 +2,28 @@
 
 
 [[projects]]
+  name = "github.com/apache/thrift"
+  packages = ["lib/go/thrift"]
+  revision = "b2a4d4ae21c789b689dd162deb819665567f481c"
+  version = "0.10.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/codahale/hdrhistogram"
+  packages = ["."]
+  revision = "3a0bb77429bd3a61596f5e8a3172445844342120"
+
+[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
   version = "v1.4.7"
+
+[[projects]]
+  name = "github.com/gogo/protobuf"
+  packages = ["proto"]
+  revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -15,7 +33,12 @@
 
 [[projects]]
   name = "github.com/google/go-cmp"
-  packages = ["cmp","cmp/internal/diff","cmp/internal/function","cmp/internal/value"]
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/function",
+    "cmp/internal/value"
+  ]
   revision = "8099a9787ce5dc5984ed879a3bda47dc730a8e97"
   version = "v0.1.0"
 
@@ -24,6 +47,58 @@
   packages = ["."]
   revision = "a557574d6c024ed6e36acc8b610f5f211c91568a"
   version = "1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/opentracing-contrib/go-stdlib"
+  packages = ["nethttp"]
+  revision = "b1a47cfbdd7543e70e9ef3e73d0802ad306cc1cc"
+
+[[projects]]
+  name = "github.com/opentracing/basictracer-go"
+  packages = [
+    ".",
+    "events",
+    "wire"
+  ]
+  revision = "1b32af207119a14b1b231d451df3ed04a72efebf"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/opentracing/opentracing-go"
+  packages = [
+    ".",
+    "ext",
+    "log"
+  ]
+  revision = "1949ddbfd147afd4d964a9f00b24eb291e0e7c38"
+  version = "v1.0.2"
+
+[[projects]]
+  name = "github.com/uber/jaeger-client-go"
+  packages = [
+    ".",
+    "config",
+    "internal/baggage",
+    "internal/baggage/remote",
+    "internal/spanlog",
+    "log",
+    "rpcmetrics",
+    "thrift-gen/agent",
+    "thrift-gen/baggage",
+    "thrift-gen/jaeger",
+    "thrift-gen/sampling",
+    "thrift-gen/zipkincore",
+    "utils"
+  ]
+  revision = "3ac96c6e679cb60a74589b0d0aa7c70a906183f7"
+  version = "v2.11.2"
+
+[[projects]]
+  name = "github.com/uber/jaeger-lib"
+  packages = ["metrics"]
+  revision = "7f95f4f7e80028096410abddaae2556e4c61b59f"
+  version = "v1.3.1"
 
 [[projects]]
   branch = "master"
@@ -57,7 +132,14 @@
 
 [[projects]]
   name = "go.uber.org/zap"
-  packages = [".","buffer","internal/bufferpool","internal/color","internal/exit","zapcore"]
+  packages = [
+    ".",
+    "buffer",
+    "internal/bufferpool",
+    "internal/color",
+    "internal/exit",
+    "zapcore"
+  ]
   revision = "35aad584952c3e7020db7b839f6b102de6271f89"
   version = "v1.7.1"
 
@@ -70,13 +152,22 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp"]
+  packages = [
+    "context",
+    "context/ctxhttp",
+    "internal/timeseries",
+    "trace"
+  ]
   revision = "f5dfe339be1d06f81b22525fe34671ee7d2c8904"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/oauth2"
-  packages = [".","clientcredentials","internal"]
+  packages = [
+    ".",
+    "clientcredentials",
+    "internal"
+  ]
   revision = "543e37812f10c46c622c9575afd7ad22f22a12ba"
 
 [[projects]]
@@ -87,13 +178,21 @@
 
 [[projects]]
   name = "google.golang.org/appengine"
-  packages = ["internal","internal/base","internal/datastore","internal/log","internal/remote_api","internal/urlfetch","urlfetch"]
+  packages = [
+    "internal",
+    "internal/base",
+    "internal/datastore",
+    "internal/log",
+    "internal/remote_api",
+    "internal/urlfetch",
+    "urlfetch"
+  ]
   revision = "150dc57a1b433e64154302bdc40b6bb8aefa313a"
   version = "v1.0.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "926880cda418061c158e37a1fc78e22b64a443043d5591e7c8542cdbcb0133f5"
+  inputs-digest = "21dfa148394efe5a9165699175cf512061e7887a1bcc1898168cac15a1ee3e22"
   solver-name = "gps-cdcl"
   solver-version = 1

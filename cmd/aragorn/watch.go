@@ -91,8 +91,7 @@ func (cmd *watchCommand) runSuiteFromFile(path string) {
 		fmt.Fprintf(os.Stderr, "%s: %v", path, err)
 		return
 	}
-	log.Info("running test suite", zap.String("file", s.Path()), zap.String("suite", s.Name()), zap.String("type", s.Type()))
-	s.RunNotify(ctx, logNotifier)
+	s.Run(ctx)
 }
 
 func (*watchCommand) fsWatchErrorLoop(errc <-chan error) error {
