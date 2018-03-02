@@ -93,7 +93,7 @@ func run() int {
 			fs.SetOutput(os.Stderr)
 			debug := fs.Bool("debug", false, "Enable debug mode")
 			logLevel := fs.String("log-level", "info", `Set the logging level ("debug"|"info"|"warn"|"error"|"fatal")`)
-			httpLAddr := fs.String("http-laddr", "", "Set the http listen address")
+			httpLAddr := fs.String("http-laddr", "", "Set the http listen address for tracing, metrics, expvar...")
 			tracer := fs.String("tracer", "", `Set the tracer ("basic"|"jaeger")`)
 			tracerAddr := fs.String("tracer-addr", "localhost:6831", "Set the tracer address")
 

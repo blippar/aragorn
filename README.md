@@ -91,9 +91,9 @@ configuration fields for the scheduling and notification handling. The tests are
 | type       | `string`                   | **REQUIRED**. `HTTP` or `GRPC` (currently only `HTTP` is implemented)                                                                 |
 | runEvery   | `string`                   | A duration string parsable by time.ParseDuration specifying at each interval this test suite should be run. Exclusive with `runCron`. |
 | runCron    | `string`                   | A cron-syntax string specifying when to run this test suite. Exclusive with `runEvery`                                                |
-| retryCount | `int`                      | Number of time a test can be retry, if any error happened. (default 1)                                                                |
-| retryWait  | `string`                   | Duration between each retry in second. (default 1s)                                                                                   |
-| timeout    | `string`                   | Timeout specifies a time limit for each test in second. (default 30s)                                                                 |
+| retryCount | `int`                      | Number of time a test can be retried, if any error happened. (default 1)                                                              |
+| retryWait  | `string`                   | Duration between each retry. (default 1s)                                                                                             |
+| timeout    | `string`                   | Timeout specifies a time limit for each test. (default 30s)                                                                           |
 | failFast   | `bool`                     | Stop after first test failure                                                                                                         |
 | suite      | `HTTPSuite` or `GRPCSuite` | **REQUIRED**. An object describing the test suite itself. Depends on the field `type`.                                                |
 
