@@ -2,35 +2,56 @@ package httpexpect
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"crypto/tls"
 	"io/ioutil"
 	"net/http"
-	"time"
 
+	"github.com/opentracing-contrib/go-stdlib/nethttp"
+	ot "github.com/opentracing/opentracing-go"
 	"github.com/xeipuuv/gojsonschema"
+	"golang.org/x/oauth2"
 
+	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
 
-const (
-	defaultRetryCount = 1
-	defaultRetryWait  = 1 * time.Second
-)
+var _ testsuite.Suite = (*Suite)(nil)
 
 // Suite describes an HTTP test suite.
 type Suite struct {
-	tests []*test
-
-	client *http.Client
-
-	retryCount int
-	retryWait  time.Duration
+	tests []testsuite.Test
 }
 
+// New returns a Suite.
+func New(cfg *Config) (*Suite, error) {
+	client := &http.Client{}
+	if cfg.Base.Insecure {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	}
+	client.Transport = &nethttp.Transport{RoundTripper: client.Transport}
+	if cfg.Base.OAUTH2.ClientID != "" && cfg.Base.OAUTH2.ClientSecret != "" {
+		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
+		client = cfg.Base.OAUTH2.Client(ctx)
+	}
+	tests, err := cfg.genTests(client)
+	if err != nil {
+		return nil, err
+	}
+	return &Suite{tests: tests}, nil
+}
+
+func (s *Suite) Tests() []testsuite.Test { return s.tests }
+
 type test struct {
-	name string
-	req  *http.Request // Raw HTTP request generated from the request description.
+	name        string
+	description string
+
+	client *http.Client
+	req    *http.Request // Raw HTTP request generated from the request description.
 
 	statusCode int
 	header     Header
@@ -40,90 +61,28 @@ type test struct {
 	jsonValues map[string]interface{} // Decoded JSONValues.
 }
 
-// RunOption is a function that configures a Suite.
-type RunOption func(*Suite)
+func (t *test) Name() string        { return t.name }
+func (t *test) Description() string { return t.description }
 
-// New returns a Suite.
-func New(cfg *Config) (*Suite, error) {
-	tests, err := cfg.genTests()
+func (t *test) Run(ctx context.Context, l testsuite.Logger) {
+	req := t.cloneRequest().WithContext(ctx)
+
+	opName := "HTTP: " + t.Name()
+	req, ht := nethttp.TraceRequest(ot.GlobalTracer(), req, nethttp.OperationName(opName))
+	defer ht.Finish()
+
+	resp, err := t.client.Do(req)
 	if err != nil {
-		return nil, err
-	}
-	s := &Suite{
-		tests:      tests,
-		client:     http.DefaultClient,
-		retryCount: defaultRetryCount,
-		retryWait:  defaultRetryWait,
-	}
-	if cfg.Base.OAUTH2.ClientID != "" && cfg.Base.OAUTH2.ClientSecret != "" {
-		s.client = cfg.Base.OAUTH2.Client(context.Background())
-	}
-	if cfg.Base.RetryCount > 0 {
-		s.retryCount = cfg.Base.RetryCount
-	}
-	if cfg.Base.RetryWait > 0 {
-		s.retryWait = time.Duration(cfg.Base.RetryWait) * time.Second
-	}
-	return s, nil
-}
-
-// NewSuiteFromJSON returns a `testsuite.Suite` using the cfg to construct the config.
-func NewSuiteFromJSON(path string, data []byte) (testsuite.Suite, error) {
-	cfg := &Config{}
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("could not unmarshal HTTP test suite: %v", err)
-	}
-	cfg.Path = path
-	return New(cfg)
-}
-
-// Run runs all the tests in the suite.
-func (s *Suite) Run(r testsuite.Report) {
-	for _, t := range s.tests {
-		tr := r.AddTest(t.name)
-		s.runTestWithRetry(t, tr)
-		if tr.Done() {
-			return
-		}
-	}
-}
-
-// runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
-// in between each try. It returns the error of the last tentative if none is sucessful,
-// nil otherwise.
-func (s *Suite) runTestWithRetry(t *test, l Logger) {
-	if s.retryCount == 1 {
-		if err := s.runTest(t, l); err != nil {
-			l.Error(err)
-		}
+		l.Errorf("could not do HTTP request: %v", err)
 		return
-	}
-	for attempt := 1; ; attempt++ {
-		err := s.runTest(t, l)
-		if err == nil {
-			return
-		}
-		if attempt >= s.retryCount {
-			l.Errorf("could not run test after %d attempts: %v", attempt, err)
-			return
-		}
-		time.Sleep(s.retryWait * time.Duration(attempt))
-	}
-}
-
-func (s *Suite) runTest(t *test, l Logger) error {
-	req := t.cloneRequest()
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("could not do HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("could not read body: %v", err)
+		l.Errorf("could not read body: %v", err)
+		return
 	}
 	checkResponse(t, l, resp, body)
-	return nil
 }
 
 // cloneRequest returns a clone of the provided *http.Request.
@@ -145,5 +104,14 @@ func (t *test) cloneRequest() *http.Request {
 }
 
 func init() {
-	testsuite.Register("HTTP", NewSuiteFromJSON)
+	plugin.Register(&plugin.Registration{
+		Type:   plugin.TestSuitePlugin,
+		ID:     "HTTP",
+		Config: (*Config)(nil),
+		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
+			cfg := ctx.Config.(*Config)
+			cfg.Path = ctx.Root
+			return New(cfg)
+		},
+	})
 }

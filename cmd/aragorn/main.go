@@ -5,20 +5,37 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"text/tabwriter"
 
+	"go.uber.org/zap"
+
 	"github.com/blippar/aragorn/log"
 
+	_ "github.com/blippar/aragorn/notifier/slack"
 	_ "github.com/blippar/aragorn/testsuite/grpcexpect"
 	_ "github.com/blippar/aragorn/testsuite/httpexpect"
 )
+
+const testSuiteJSONSuffix = ".suite.json"
 
 const (
 	successExitCode = 0
 	errorExitCode   = 1
 )
+
+const fileHelp = `
+
+For each operand that names a file of type directory,
+all the files with the extension .suite.json in the directory will be used as test suites.
+
+For each operand that names a file of a type other than directory,
+the file will be used as a test suite.
+
+If no operands are given, the current directory is used.
+`
 
 type command interface {
 	Name() string           // "foobar"
@@ -37,9 +54,11 @@ func main() {
 func run() int {
 	// Build the list of available commands.
 	commands := [...]command{
-		&runCommand{},
-		&execCommand{},
+		&initCommand{},
 		&listCommand{},
+		&execCommand{},
+		&watchCommand{},
+		&runCommand{},
 		&versionCommand{},
 	}
 
@@ -74,6 +93,9 @@ func run() int {
 			fs.SetOutput(os.Stderr)
 			debug := fs.Bool("debug", false, "Enable debug mode")
 			logLevel := fs.String("log-level", "info", `Set the logging level ("debug"|"info"|"warn"|"error"|"fatal")`)
+			httpLAddr := fs.String("http-laddr", "", "Set the http listen address for tracing, metrics, expvar...")
+			tracer := fs.String("tracer", "", `Set the tracer ("basic"|"jaeger")`)
+			tracerAddr := fs.String("tracer-addr", "localhost:6831", "Set the tracer address")
 
 			// Register the subcommand flags in there, too.
 			cmd.Register(fs)
@@ -98,6 +120,22 @@ func run() int {
 				return errorExitCode
 			}
 			defer log.L().Sync()
+
+			switch *tracer {
+			case "basic":
+				newBasicTracer()
+			case "jaeger":
+				defer newJaegerTracer(*tracerAddr).Close()
+			}
+
+			if *httpLAddr != "" {
+				go func() {
+					if err := http.ListenAndServe(*httpLAddr, nil); err != nil {
+						log.Error("http server failure", zap.Error(err))
+					}
+				}()
+			}
+
 			// Run the command with the post-flag-processing args.
 			if err := cmd.Run(fs.Args()); err != nil {
 				fmt.Fprintln(os.Stderr, err)

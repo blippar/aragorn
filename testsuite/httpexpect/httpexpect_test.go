@@ -2,6 +2,7 @@ package httpexpect
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -291,10 +292,9 @@ func TestSuiteRunTestSimple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create suite: %v", err)
 	}
+	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(suite.tests[0], tr); err != nil {
-		t.Fatalf("run test failed: %v", err)
-	}
+	suite.tests[0].Run(ctx, tr)
 	if len(tr.errs) > 0 {
 		t.Fatalf("unexpected test report errors: %v", tr.errs)
 	}
@@ -337,10 +337,9 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't create suite: %v", err)
 	}
+	ctx := context.Background()
 	tr := &mockLogger{}
-	if err := suite.runTest(suite.tests[0], tr); err != nil {
-		t.Fatalf("run test failed: %v", err)
-	}
+	suite.tests[0].Run(ctx, tr)
 	if len(tr.errs) > 0 {
 		t.Fatalf("unexpected test report errors: %v", tr.errs)
 	}
@@ -368,9 +367,11 @@ func TestQueryJSONData(t *testing.T) {
 		{"obj sub obj field a", m, "sub.a", "b", ""},
 		{"obj sub obj field not found", m, "sub.d", "", "sub.d: object does not contain field"},
 		{"obj sub arr", m, "arr.0", 42, ""},
+		{"obj sub arr length check", m, "arr.length", json.Number("3"), ""},
 		{"obj sub arr out of bounds", m, "arr.125", 42, "arr.125: array index out of bounds"},
 		{"arr simple int", arr, "0", 1, ""},
 		{"arr simple string", arr, "3", "test", ""},
+		{"arr simple length check", arr, "length", json.Number("6"), ""},
 		{"arr invalid index", arr, "invalid_index", nil, "invalid_index: invalid array index"},
 		{"arr out of bounds", arr, "1234", nil, "1234: array index out of bounds"},
 		{"arr sub obj field a", arr, "5.abc", "def", ""},
@@ -406,6 +407,7 @@ func TestLookupJSONData(t *testing.T) {
 		{"obj field not found", m, "invalid_key", errObjectFieldNotFound},
 		{"arr simple int", arr, "0", 1},
 		{"arr simple string", arr, "3", "test"},
+		{"arr simple length check", arr, "length", json.Number("5")},
 		{"arr invalid index", arr, "invalid_index", errInvalidArrayIndex},
 		{"arr out of bounds", arr, "1234", errIndexOutOfBounds},
 		{"invalid type", nil, "key", errInvalidType},

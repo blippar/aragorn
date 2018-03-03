@@ -1,9 +1,11 @@
 package httpexpect
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,6 +15,8 @@ import (
 
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/oauth2/clientcredentials"
+
+	"github.com/blippar/aragorn/testsuite"
 )
 
 type Config struct {
@@ -22,11 +26,10 @@ type Config struct {
 }
 
 type Base struct {
-	URL        string // Base URL prepended to all requests' path.
-	Header     Header // Base set of headers added to all requests.
-	OAUTH2     clientcredentials.Config
-	RetryCount int
-	RetryWait  int
+	URL      string // Base URL prepended to all requests' path.
+	Header   Header // Base set of headers added to all requests.
+	OAUTH2   clientcredentials.Config
+	Insecure bool
 }
 
 type Test struct {
@@ -36,10 +39,11 @@ type Test struct {
 }
 
 type Request struct {
-	URL    string // If set, will overwrite the base URL.
-	Path   string
-	Method string
-	Header Header
+	URL     string // If set, will overwrite the base URL.
+	Path    string
+	Method  string
+	Header  Header
+	Timeout int
 
 	// Only one of the three following must be set.
 	Body      interface{}
@@ -67,7 +71,7 @@ func (h Header) addToRequest(req *http.Request) {
 
 // genTest verifies that an HTTP test suite is valid. It also create the HTTP requests,
 // compiles JSON schemas and unmarshal JSON documents.
-func (cfg *Config) genTests() ([]*test, error) {
+func (cfg *Config) genTests(client *http.Client) ([]testsuite.Test, error) {
 	if cfg.Base.URL == "" {
 		return nil, errors.New("base: URL is required")
 	}
@@ -77,12 +81,12 @@ func (cfg *Config) genTests() ([]*test, error) {
 	if len(cfg.Tests) == 0 {
 		return nil, errors.New("a test suite must contain at least one test")
 	}
-	ts := make([]*test, len(cfg.Tests))
+	ts := make([]testsuite.Test, len(cfg.Tests))
 	var errs []string
-	for i, test := range cfg.Tests {
-		t, err := test.prepare(cfg)
+	for i, testcfg := range cfg.Tests {
+		t, err := testcfg.prepare(cfg, client)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("test %q:\n%v", test.Name, err))
+			errs = append(errs, fmt.Sprintf("test %q:\n%v", testcfg.Name, err))
 		}
 		ts[i] = t
 	}
@@ -92,9 +96,10 @@ func (cfg *Config) genTests() ([]*test, error) {
 	return ts, nil
 }
 
-func (t *Test) prepare(cfg *Config) (*test, error) {
+func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 	test := &test{
 		name:       t.Name,
+		client:     client,
 		statusCode: t.Expect.StatusCode,
 		header:     make(Header),
 	}
@@ -120,6 +125,7 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 		errs = append(errs, fmt.Sprintf("- request: could not create HTTP request: %v", err))
 	} else {
 		test.req = httpReq
+		test.description = httpReq.Method + " " + httpReq.URL.String()
 	}
 
 	if test.statusCode == 0 {
@@ -133,42 +139,51 @@ func (t *Test) prepare(cfg *Config) (*test, error) {
 		errs = append(errs, "- expect: jsonValues can't be set with document")
 	}
 
-	if t.Expect.Document != nil {
-		doc, err := cfg.getDocumentField(t.Expect.Document)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("- expect: could get Document: %v", err))
-		}
-		test.document = doc
-	}
+	expectJSONBody := false
 
-	if t.Expect.JSONSchema != nil {
-		m, err := cfg.getObjectField(t.Expect.JSONSchema)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("- expect: could get JSON schema: %v", err))
+	if t.Expect.Document != nil {
+		if doc, err := cfg.getDocumentField(t.Expect.Document); err != nil {
+			errs = append(errs, fmt.Sprintf("- expect: could get Document: %v", err))
 		} else {
-			schemaLoader := gojsonschema.NewGoLoader(m)
-			test.jsonSchema, err = gojsonschema.NewSchema(schemaLoader)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("- expect: could not load JSON schema: %v", err))
+			test.document = doc
+			if _, ok := doc.([]byte); !ok {
+				expectJSONBody = true
 			}
 		}
 	}
 
+	if t.Expect.JSONSchema != nil {
+		if ref, ok := t.Expect.JSONSchema["$ref"].(string); ok {
+			if !strings.Contains(ref, "://") {
+				relRef := cfg.getFilePath(ref)
+				if absRef, err := filepath.Abs(relRef); err == nil {
+					t.Expect.JSONSchema["$ref"] = "file://" + absRef
+				}
+			}
+		}
+		schemaLoader := newJSONGoLoader(t.Expect.JSONSchema)
+		if jsonSchema, err := gojsonschema.NewSchema(schemaLoader); err != nil {
+			errs = append(errs, fmt.Sprintf("- expect: could not load JSON schema: %v", err))
+		} else {
+			test.jsonSchema = jsonSchema
+		}
+		expectJSONBody = true
+	}
+
 	if t.Expect.JSONValues != nil {
-		m, err := cfg.getObjectField(t.Expect.JSONValues)
-		if err != nil {
+		if m, err := cfg.getObjectField(t.Expect.JSONValues); err != nil {
 			errs = append(errs, fmt.Sprintf("- expect: could get JSON values: %v", err))
 		} else {
 			test.jsonValues = m
 		}
+		expectJSONBody = true
 	}
 
 	if err := concatErrors(errs); err != nil {
 		return nil, err
 	}
 
-	_, isRawDoc := test.document.([]byte)
-	if test.req.Header.Get("Accept") == "" && (test.jsonSchema != nil || test.jsonValues != nil || (test.document != nil && !isRawDoc)) {
+	if expectJSONBody && test.req.Header.Get("Accept") == "" {
 		test.req.Header.Set("Accept", "application/json")
 	}
 	return test, nil
@@ -197,7 +212,7 @@ func (cfg *Config) getDocumentField(v interface{}) (interface{}, error) {
 		return ioutil.ReadAll(f)
 	}
 	var newVal interface{}
-	err = json.NewDecoder(f).Decode(&newVal)
+	err = decodeReaderJSON(f, &newVal)
 	return newVal, err
 }
 
@@ -213,7 +228,7 @@ func (cfg *Config) getObjectField(m map[string]interface{}) (map[string]interfac
 	}
 	defer f.Close()
 	var newVal map[string]interface{}
-	err = json.NewDecoder(f).Decode(&newVal)
+	err = decodeReaderJSON(f, &newVal)
 	return newVal, err
 }
 
@@ -235,4 +250,14 @@ func concatErrors(errs []string) error {
 		return errors.New(strings.Join(errs, "\n"))
 	}
 	return nil
+}
+
+func decodeReaderJSON(r io.Reader, v interface{}) error {
+	decoder := json.NewDecoder(r)
+	decoder.UseNumber()
+	return decoder.Decode(v)
+}
+
+func decodeJSON(b []byte, v interface{}) error {
+	return decodeReaderJSON(bytes.NewReader(b), v)
 }

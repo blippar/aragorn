@@ -13,33 +13,34 @@ type Notifier interface {
 	Notify(r *Report)
 }
 
+type Suite interface {
+	Name() string
+	Type() string
+	FailFast() bool
+	Tests() []testsuite.Test
+}
+
 type Report struct {
-	Name     string
-	Start    time.Time
-	Duration time.Duration
-	Tests    []*TestReport
-	failfast bool
+	Suite       Suite
+	Start       time.Time
+	Duration    time.Duration
+	TestReports []*TestReport
+	NbFailed    int
 }
 
-type TestReport struct {
-	Name     string
-	Start    time.Time
-	Duration time.Duration
-	Errs     []error
-	failfast bool
-}
-
-func NewReport(name string, failfast bool) *Report {
+func NewReport(s Suite) *Report {
 	return &Report{
-		Name:     name,
-		Start:    time.Now(),
-		failfast: failfast,
+		Suite: s,
+		Start: time.Now(),
 	}
 }
 
-func (r *Report) AddTest(name string) testsuite.TestReport {
-	tr := newTestReport(name, r.failfast)
-	r.Tests = append(r.Tests, tr)
+func (r *Report) NewTestReport(t testsuite.Test) *TestReport {
+	tr := &TestReport{
+		Test:  t,
+		Start: time.Now(),
+	}
+	r.TestReports = append(r.TestReports, tr)
 	return tr
 }
 
@@ -47,12 +48,11 @@ func (r *Report) Done() {
 	r.Duration = time.Since(r.Start)
 }
 
-func newTestReport(name string, failfast bool) *TestReport {
-	return &TestReport{
-		Name:     name,
-		Start:    time.Now(),
-		failfast: failfast,
-	}
+type TestReport struct {
+	Test     testsuite.Test
+	Start    time.Time
+	Duration time.Duration
+	Errs     []error
 }
 
 func (tr *TestReport) Error(args ...interface{}) {
@@ -63,7 +63,6 @@ func (tr *TestReport) Errorf(format string, args ...interface{}) {
 	tr.Errs = append(tr.Errs, fmt.Errorf(format, args...))
 }
 
-func (tr *TestReport) Done() bool {
+func (tr *TestReport) Done() {
 	tr.Duration = time.Since(tr.Start)
-	return tr.failfast && len(tr.Errs) > 0
 }
