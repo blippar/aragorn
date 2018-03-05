@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"reflect"
 	"sync"
 
 	"github.com/fullstorydev/grpcurl"
@@ -31,19 +32,25 @@ type Config struct {
 	Path         string
 	Address      string
 	ProtoSetPath string
-	Tests        []struct {
-		Name    string
-		Request struct {
-			Method   string
-			Header   Header
-			Document interface{}
-		}
-		Expect struct {
-			Code     codes.Code
-			Header   Header
-			Document interface{}
-		}
-	}
+	Tests        []TestConfig
+}
+
+type TestConfig struct {
+	Name    string
+	Request RequestConfig
+	Expect  ExpectConfig
+}
+
+type RequestConfig struct {
+	Method   string
+	Header   Header
+	Document interface{}
+}
+
+type ExpectConfig struct {
+	Code     codes.Code
+	Header   Header
+	Document interface{}
 }
 
 // A Header represents the key-value pairs in an HTTP header.
@@ -96,6 +103,7 @@ func New(cfg *Config) (*Suite, error) {
 			name:       tcfg.Name,
 			req: request{
 				methodName: tcfg.Request.Method,
+				headers:    headers,
 				msgs:       reqMsgs,
 			},
 			expect: expect{
@@ -138,37 +146,46 @@ func (t *test) Run(ctx context.Context, logger testsuite.Logger) {
 	h := &handler{reqs: t.req.msgs}
 	err := grpcurl.InvokeRpc(ctx, t.descSource, t.cc, t.req.methodName, t.req.headers, h, h.getRequestData)
 	if err != nil {
-		logger.Errorf("could not invoking %q method: %v ", t.req.methodName, err)
+		logger.Errorf("could not invoking method: %v", err)
 		return
 	}
 	if got, want := h.status.Code(), t.expect.code; got != want {
-		logger.Errorf("wrong status code (got %s; want %s) %s", got, want, h.status.Message())
+		logger.Errorf("wrong status code (got %s; want %s) message=%q", got, want, h.status.Message())
 		return
 	}
 	for k, want := range t.expect.header {
-		vals := h.md[k]
-		if len(vals) == 0 {
+		vs := h.md[k]
+		if len(vs) == 0 {
 			logger.Errorf("missing header %s", k)
 			continue
 		}
-		if got := vals[0]; got != want {
+		if got := vs[0]; got != want {
 			logger.Errorf("wrong value for header %q (got %q; want %q)", k, got, want)
 		}
 	}
+	if len(t.expect.msgs) != len(h.resps) {
+		logger.Errorf("wrong number of response (got %d; want %d)", len(h.resps), len(t.expect.msgs))
+	}
 	for i, wantRaw := range t.expect.msgs {
 		if i >= len(h.resps) {
-			logger.Errorf("wrong number of response (got %d; want %d)", len(h.resps), len(t.expect.msgs))
 			break
 		}
 		got := h.resps[i]
-		wantP := *got
-		want := &wantP
-		want.Reset()
+		var want proto.Message
+		switch v := got.(type) {
+		case *dynamic.Message:
+			gotCopy := *v
+			gotCopy.Reset()
+			want = &gotCopy
+		default:
+			wantRef := reflect.New(reflect.TypeOf(got).Elem())
+			want = wantRef.Interface().(proto.Message)
+		}
 		if err := json.Unmarshal(wantRaw, want); err != nil {
 			logger.Errorf("could not unmarshal expected document: %v", err)
 			continue
 		}
-		if !dynamic.Equal(got, want) {
+		if !dynamic.MessagesEqual(got, want) {
 			logger.Errorf("wrong response\ngot: %s\nwant: %s", got, want)
 		}
 	}
@@ -182,7 +199,7 @@ type handler struct {
 	methodDesc *desc.MethodDescriptor
 	md         metadata.MD
 	status     *status.Status
-	resps      []*dynamic.Message
+	resps      []proto.Message
 }
 
 func (h *handler) OnResolveMethod(md *desc.MethodDescriptor)               { h.methodDesc = md }
@@ -191,7 +208,7 @@ func (h *handler) OnReceiveHeaders(md metadata.MD)                         { h.m
 func (h *handler) OnReceiveTrailers(status *status.Status, md metadata.MD) { h.status = status }
 
 func (h *handler) OnReceiveResponse(resp proto.Message) {
-	h.resps = append(h.resps, resp.(*dynamic.Message))
+	h.resps = append(h.resps, resp)
 }
 
 func (h *handler) getRequestData() ([]byte, error) {
@@ -212,6 +229,8 @@ func newDocToMsgs(doc interface{}) ([][]byte, error) {
 		a = v
 	case map[string]interface{}:
 		a = []interface{}{v}
+	case nil:
+		a = []interface{}{struct{}{}}
 	default:
 		return nil, errors.New("invalid document type")
 	}
