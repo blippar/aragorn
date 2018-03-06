@@ -27,6 +27,7 @@ func TestNewProtoset(t *testing.T) {
 	cfg := &Config{
 		Address:      l.Addr().String(),
 		ProtoSetPath: "./grpctesting/test.protoset",
+		Header:       Header{"hello": "world"},
 		Tests: []TestConfig{
 			{
 				Name:    "Empty Call",
@@ -37,7 +38,6 @@ func TestNewProtoset(t *testing.T) {
 				Name: "Simple Call",
 				Request: RequestConfig{
 					Method:   "grpcexpect.testing.TestService/SimpleCall",
-					Header:   Header{"hello": "world"},
 					Document: map[string]interface{}{"username": "world"},
 				},
 				Expect: ExpectConfig{

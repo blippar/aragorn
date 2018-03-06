@@ -63,7 +63,21 @@ type Expect struct {
 // A Header represents the key-value pairs in an HTTP header.
 type Header map[string]string
 
-func (h Header) addToRequest(req *http.Request) {
+func mergeHeaders(hs ...Header) Header {
+	res := make(Header)
+	for _, h := range hs {
+		res.copy(h)
+	}
+	return res
+}
+
+func (h Header) copy(src Header) {
+	for k, v := range src {
+		h[k] = v
+	}
+}
+
+func (h Header) toHTTPRequest(req *http.Request) {
 	for k, v := range h {
 		req.Header.Set(k, v)
 	}
@@ -101,11 +115,9 @@ func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 		name:       t.Name,
 		client:     client,
 		statusCode: t.Expect.StatusCode,
-		header:     make(Header),
+		header:     mergeHeaders(t.Expect.Header),
 	}
 	var errs []string
-
-	copyHeader(test.header, t.Expect.Header)
 
 	set := 0
 	if t.Request.Body != nil {
@@ -237,12 +249,6 @@ func (cfg *Config) getFilePath(path string) string {
 		return path
 	}
 	return filepath.Join(cfg.Path, path)
-}
-
-func copyHeader(dest, src Header) {
-	for k, v := range src {
-		dest[k] = v
-	}
 }
 
 func concatErrors(errs []string) error {
