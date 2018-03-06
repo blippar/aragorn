@@ -101,10 +101,13 @@ Example:
 
 ```json
 {
-    "name": "Service 1 HTTP test suite",
-    "type": "HTTP",
-    "runEvery": "12h",
-    "suite": {"..."}
+  "name": "Service 1 HTTP test suite",
+  "type": "HTTP",
+  "runEvery": "12h",
+  "retryCount": 3,
+  "retryWait": "100ms",
+  "timeout": "10s",
+  "suite": {"..."}
 }
 ```
 
@@ -140,14 +143,14 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 #### HTTPRequest
 
-| Name      | Type                | Description                                                             |
-| --------- | ------------------- | ----------------------------------------------------------------------- |
-| path      | `string`            | Path appended to the base `url` set in the `HTTPBase`. Defaults to `/`. |
-| method    | `string`            | HTTP method of the request. Defaults to `GET`.                          |
-| header    | `map[string]string` | List of request header fields.                                          |
-| multipart | `map[string]string` | Multipart content of the request. Values started with a `@` are files.  |
-| formData  | `map[string]string` | Form data as application/x-url-encoded format.                          |
-| body      | `Document`          | Request body.                                                           |
+| Name      | Type                | Description                                                            |
+| --------- | ------------------- | ---------------------------------------------------------------------- |
+| path      | `string`            | Path appended to the base `url` set in the `HTTPBase`. (default: `/`)  |
+| method    | `string`            | HTTP method of the request. (default: `GET`)                           |
+| header    | `map[string]string` | List of request header fields.                                         |
+| multipart | `map[string]string` | Multipart content of the request. Values started with a `@` are files. |
+| formData  | `map[string]string` | Form data as application/x-url-encoded format.                         |
+| body      | `HTTPDocument`      | Request body.                                                          |
 
 #### HTTPExpect
 
@@ -155,13 +158,13 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | ---------- | ------------------- | -------------------------------------------- |
 | statusCode | `int`               | **REQUIRED**. Expected HTTP status code.     |
 | header     | `map[string]string` | Expected key-value pairs in the HTTP header. |
-| document   | `Document`          | Expected document to be returned.            |
-| jsonSchema | `Object`            | Expected JSON schema (1) to be returned.     |
-| jsonValues | `Object`            | Specific JSON values to be returned.         |
+| document   | `HTTPDocument`      | Expected document to be returned.            |
+| jsonSchema | `HTTPObject`        | Expected JSON schema (1) to be returned.     |
+| jsonValues | `HTTPObject`        | Specific JSON values to be returned.         |
 
-1. See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
+1.  See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
 
-#### Document
+#### HTTPDocument
 
 Document is any type with some special behaviors like reference.
 
@@ -190,33 +193,22 @@ Inline RAW document:
 }
 ```
 
-#### Object
+#### HTTPObject
 
 Object must be a JSON object (`map[string]interface{}`). It can load a JSON
 object from a file (see `Document` doc).
 
-### GRPC Suite
+#### HTTP Example
 
-Work in progress...
+This example shows how to create an HTTP test suite file that has 2 tests:
 
-## Example
-
-This example shows how to create an HTTP test suite file that will run 2 tests
-every 12h:
-
-* The first one is a `GET http://localhost:8080/` and expects a 200 JSON
-  response `{"key": "value"}`.
-* The second test is a `POST http://localhost:8080/echo` with a JSON body
-  containing `{"key":"value", "a": [1, 2, 3], "b": {"c": "d"}}`. It expects a JSON response matching the JSON schema `schema.json` and the given JSON values.
+* The first one is a `GET http://localhost:8080/` request and expects a 200 JSON response `{"key": "value"}`.
+* The second test is a `POST http://localhost:8080/echo` request with a JSON body containing `{"key":"value", "a": [1, 2, 3], "b": {"c": "d"}}`. It expects a JSON response matching the JSON schema `schema.json` and the given JSON values.
 
 ```json
 {
-  "name": "Service 1 HTTP test suite",
+  "name": "Service 1",
   "type": "HTTP",
-  "runEvery": "12h",
-  "retryCount": 3,
-  "retryWaint": "100ms",
-  "timeout": "10s",
   "suite": {
     "base": {
       "url": "http://localhost:8080",
@@ -267,6 +259,92 @@ every 12h:
             "a.length": 3,
             "b.c": "d"
           }
+        }
+      }
+    ]
+  }
+}
+```
+
+### GRPC Suite
+
+An GRPC test suite contains a base configuration and list of tests.
+
+| Name               | Type           | Description                                                                                                                    |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| address            | `string`       | **REQUIRED**. target address for the connection to the server.                                                                 |
+| protoSetPath       | `string`       | The path of a file containing an encoded FileDescriptorSet. (default: get the remote server proto via the GRPC reflection API) |
+| tls                | `bool`         | TLS connection to the server (default: use plain-text HTTP/2)                                                                  |
+| caPath             | `string`       | File containing trusted root certificates for verifying the server.                                                            |
+| serverHostOverride | `string`       | Override the virtual host name of authority (e.g. :authority header field) in requests.                                        |
+| insecure           | `bool`         | Skip server certificate and domain verification.                                                                               |
+| oauth2             | `OAUTH2Config` | Describes a 2-legged OAuth2 flow.                                                                                              |
+| header             | `Header`       | List of request header fields to add to every test in this suite. Each test can overwrite the header fields set at this level. |
+| tests              | `[]GRPCTest`   | **REQUIRED**. List of tests to run.                                                                                            |
+
+#### GRPCTest
+
+| Name    | Type          | Description                                                          |
+| ------- | ------------- | -------------------------------------------------------------------- |
+| name    | `string`      | **REQUIRED**. Name used to uniquely identify this test in the suite. |
+| request | `GRPCRequest` | **REQUIRED**. Description of the GRPC request to perform.            |
+| expect  | `GRPCExpect`  | Expected result of the GRPC request.                                 |
+
+#### GRPCRequest
+
+| Name     | Type                | Description                                                                                  |
+| -------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| method   | `string`            | **REQUIRED**. GRPC method of the request. (e.g. `grpcexpect.testing.TestService/SimpleCall`) |
+| header   | `map[string]string` | List of request header fields.                                                               |
+| document | `GRPCDocument`      | Request GRPC.                                                                                |
+
+#### GRPCExpect
+
+| Name     | Type                | Description                                  |
+| -------- | ------------------- | -------------------------------------------- |
+| Code     | `string`            | Expected GRPC code. (default: `OK`)          |
+| header   | `map[string]string` | Expected key-value pairs in the GRPC header. |
+| document | `GRPCDocument`      | Expected response document.                  |
+
+#### GRPCDocument
+
+Document is any type with some special behaviors like reference.
+
+Load a JSON document from a file:
+
+```json
+{
+  "$ref": "user.json"
+}
+```
+
+#### GRPC Example
+
+This example shows how to create an GRPC test suite file that has 2 tests.
+
+```json
+{
+  "name": "Service 2",
+  "type": "GRPC",
+  "suite": {
+    "address": "localhost:50051",
+    "header": { "hello": "world" },
+    "tests": [
+      {
+        "name": "Empty Call",
+        "request": { "method": "grpcexpect.testing.TestService/EmptyCall" },
+        "expect": { "code": "OK" }
+      },
+      {
+        "name": "Simple Call",
+        "request": {
+          "method": "grpcexpect.testing.TestService/SimpleCall",
+          "document": { "username": "world" }
+        },
+        "expect": {
+          "code": "OK",
+          "header": { "hello": "world" },
+          "document": { "message": "Hello world!" }
         }
       }
     ]
