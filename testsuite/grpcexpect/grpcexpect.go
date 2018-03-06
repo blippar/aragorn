@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -19,9 +20,13 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/grpcreflect"
+	"github.com/opentracing-contrib/go-stdlib/nethttp"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 	"google.golang.org/grpc/metadata"
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
@@ -40,6 +45,7 @@ type Config struct {
 	CAPath             string
 	ServerHostOverride string
 	Insecure           bool
+	OAUTH2             clientcredentials.Config
 	Tests              []TestConfig
 }
 
@@ -107,11 +113,18 @@ func New(cfg *Config) (*Suite, error) {
 	if err != nil {
 		return nil, err
 	}
-	cc, err := grpc.Dial(cfg.Address,
+	opts := []grpc.DialOption{
 		grpc.WithUnaryInterceptor(otgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otgrpc.StreamClientInterceptor()),
 		tcOpt,
-	)
+	}
+	if cfg.OAUTH2.ClientID != "" && cfg.OAUTH2.ClientSecret != "" {
+		httpClient := &http.Client{Transport: &nethttp.Transport{}}
+		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient)
+		ts := &oauth.TokenSource{TokenSource: cfg.OAUTH2.TokenSource(ctx)}
+		opts = append(opts, grpc.WithPerRPCCredentials(ts))
+	}
+	cc, err := grpc.Dial(cfg.Address, opts...)
 	if err != nil {
 		return nil, err
 	}
