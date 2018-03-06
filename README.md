@@ -138,8 +138,8 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | Name    | Type          | Description                                                          |
 | ------- | ------------- | -------------------------------------------------------------------- |
 | name    | `string`      | **REQUIRED**. Name used to uniquely identify this test in the suite. |
-| request | `HTTPRequest` | **REQUIRED**. Description of the HTTP request to perform.            |
-| expect  | `HTTPExpect`  | **REQUIRED**. Expected result of the HTTP request.                   |
+| request | `HTTPRequest` | Description of the HTTP request to perform.                          |
+| expect  | `HTTPExpect`  | Expected result of the HTTP request.                                 |
 
 #### HTTPRequest
 
@@ -154,13 +154,13 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 #### HTTPExpect
 
-| Name       | Type                | Description                                  |
-| ---------- | ------------------- | -------------------------------------------- |
-| statusCode | `int`               | **REQUIRED**. Expected HTTP status code.     |
-| header     | `map[string]string` | Expected key-value pairs in the HTTP header. |
-| document   | `HTTPDocument`      | Expected document to be returned.            |
-| jsonSchema | `HTTPObject`        | Expected JSON schema (1) to be returned.     |
-| jsonValues | `HTTPObject`        | Specific JSON values to be returned.         |
+| Name       | Type                | Description                                                            |
+| ---------- | ------------------- | ---------------------------------------------------------------------- |
+| statusCode | `int`               | Expected HTTP status code. Not check if the value is -1 (default: 200) |
+| header     | `map[string]string` | Expected key-value pairs in the HTTP header.                           |
+| document   | `HTTPDocument`      | Expected document to be returned.                                      |
+| jsonSchema | `HTTPObject`        | Expected JSON schema (1) to be returned.                               |
+| jsonValues | `HTTPObject`        | Expected Specific JSON values to be returned.                          |
 
 1.  See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
 
@@ -202,8 +202,8 @@ object from a file (see `Document` doc).
 
 This example shows how to create an HTTP test suite file that has 2 tests:
 
-* The first one is a `GET http://localhost:8080/` request and expects a 200 JSON response `{"key": "value"}`.
-* The second test is a `POST http://localhost:8080/echo` request with a JSON body containing `{"key":"value", "a": [1, 2, 3], "b": {"c": "d"}}`. It expects a JSON response matching the JSON schema `schema.json` and the given JSON values.
+* The first one is a `GET http://localhost:8080/` request and expects a 200 OK JSON response `{"key": "value"}`.
+* The second test is a `POST http://localhost:8080/echo` request with a 201 Created response and JSON body containing `{"key":"value", "a": [1, 2, 3], "b": {"c": "d"}}`. It expects a JSON response matching the JSON schema `schema.json` and the given JSON values.
 
 ```json
 {
@@ -229,7 +229,6 @@ This example shows how to create an HTTP test suite file that has 2 tests:
           "method": "GET"
         },
         "expect": {
-          "statusCode": 200,
           "header": {
             "Content-Type": "application/json",
             "Content-Length": "15"
@@ -248,7 +247,7 @@ This example shows how to create an HTTP test suite file that has 2 tests:
           "body": { "key": "value" }
         },
         "expect": {
-          "statusCode": 200,
+          "statusCode": 201,
           "header": {
             "Content-Type": "application/json"
           },
