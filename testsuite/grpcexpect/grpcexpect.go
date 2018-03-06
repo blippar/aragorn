@@ -2,10 +2,13 @@ package grpcexpect
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -18,6 +21,7 @@ import (
 	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
@@ -29,10 +33,14 @@ import (
 var _ testsuite.Suite = (*Suite)(nil)
 
 type Config struct {
-	Path         string
-	Address      string
-	ProtoSetPath string
-	Tests        []TestConfig
+	Path               string
+	Address            string
+	ProtoSetPath       string
+	TLS                bool
+	CAPath             string
+	ServerHostOverride string
+	Insecure           bool
+	Tests              []TestConfig
 }
 
 type TestConfig struct {
@@ -56,6 +64,37 @@ type ExpectConfig struct {
 // A Header represents the key-value pairs in an HTTP header.
 type Header map[string]string
 
+func (cfg *Config) getFilePath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(cfg.Path, path)
+}
+
+func (cfg *Config) transportDialOption() (grpc.DialOption, error) {
+	if !cfg.TLS {
+		return grpc.WithInsecure(), nil
+	}
+	cp := x509.NewCertPool()
+	if cfg.CAPath != "" {
+		caPath := cfg.getFilePath(cfg.CAPath)
+		b, err := ioutil.ReadFile(caPath)
+		if err != nil {
+			return nil, fmt.Errorf("could not read CA file: %v", err)
+		}
+		if !cp.AppendCertsFromPEM(b) {
+			return nil, fmt.Errorf("credentials: failed to append certificates")
+		}
+	}
+	tlsCfg := &tls.Config{
+		ServerName:         cfg.ServerHostOverride,
+		RootCAs:            cp,
+		InsecureSkipVerify: cfg.Insecure,
+	}
+	tc := credentials.NewTLS(tlsCfg)
+	return grpc.WithTransportCredentials(tc), nil
+}
+
 // Suite describes a GRPC test suite.
 type Suite struct {
 	tests []testsuite.Test
@@ -64,17 +103,21 @@ type Suite struct {
 // New returns a Suite.
 func New(cfg *Config) (*Suite, error) {
 	ctx := context.Background()
+	tcOpt, err := cfg.transportDialOption()
+	if err != nil {
+		return nil, err
+	}
 	cc, err := grpc.Dial(cfg.Address,
-		grpc.WithInsecure(),
 		grpc.WithUnaryInterceptor(otgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otgrpc.StreamClientInterceptor()),
+		tcOpt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	var descSource grpcurl.DescriptorSource
 	if cfg.ProtoSetPath != "" {
-		psPath := filepath.Join(cfg.Path, cfg.ProtoSetPath)
+		psPath := cfg.getFilePath(cfg.ProtoSetPath)
 		descSource, err = grpcurl.DescriptorSourceFromProtoSets(psPath)
 		if err != nil {
 			return nil, err
