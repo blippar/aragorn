@@ -76,11 +76,11 @@ func NewSuiteFromReader(r io.Reader, failfast bool, baseSuite json.RawMessage) (
 	}
 	ic := plugin.NewContext(reg, root)
 	if err := decodeJSON(cfg.Suite, ic.Config); err != nil {
-		return nil, fmt.Errorf("could not decode test suite: %v", err)
+		return nil, fmt.Errorf("could not decode test suite: %v", jsonDecodeError(nil, err))
 	}
 	if baseSuite != nil {
 		if err := decodeJSON(baseSuite, ic.Config); err != nil {
-			return nil, fmt.Errorf("could not decode base test suite: %v", err)
+			return nil, fmt.Errorf("could not decode base test suite: %v", jsonDecodeError(nil, err))
 		}
 	}
 	suite, err := reg.Init(ic)

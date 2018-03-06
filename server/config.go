@@ -117,21 +117,26 @@ func decodeJSON(b []byte, v interface{}) error {
 }
 
 func jsonDecodeError(r io.Reader, err error) error {
+	var offset int64
+	switch serr := err.(type) {
+	case *json.SyntaxError:
+		offset = serr.Offset
+	case *json.UnmarshalTypeError:
+		offset = serr.Offset
+	default:
+		return err
+	}
 	rs, ok := r.(io.ReadSeeker)
 	if !ok {
-		return err
+		return fmt.Errorf("%v (offset %d)", err, offset)
 	}
-	serr, ok := err.(*json.SyntaxError)
-	if !ok {
-		return err
+	if _, serr := rs.Seek(0, os.SEEK_SET); serr != nil {
+		return fmt.Errorf("%v: seek error: %v", err, serr)
 	}
-	if _, err := rs.Seek(0, os.SEEK_SET); err != nil {
-		return fmt.Errorf("seek error: %v", err)
-	}
-	line, col, highlight := errorutil.HighlightBytePosition(rs, serr.Offset)
+	line, col, highlight := errorutil.HighlightBytePosition(rs, offset)
 	extra := ""
 	if n, ok := r.(namer); ok {
-		extra = fmt.Sprintf("%s:%d:%d", n.Name(), line, col)
+		extra = fmt.Sprintf("\n%s:%d:%d", n.Name(), line, col)
 	}
-	return fmt.Errorf("%s\nError at line %d, column %d (file offset %d):\n%s", extra, line, col, serr.Offset, highlight)
+	return fmt.Errorf("%v%s\nError at line %d, column %d (file offset %d):\n%s", err, extra, line, col, offset, highlight)
 }
