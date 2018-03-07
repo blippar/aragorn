@@ -36,8 +36,8 @@ func (req *Request) toHTTPRequest(cfg *Config) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Base.Header.addToRequest(httpReq)
-	req.Header.addToRequest(httpReq)
+	cfg.Base.Header.toHTTPRequest(httpReq)
+	req.Header.toHTTPRequest(httpReq)
 	if cntType != "" && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", cntType)
 	}

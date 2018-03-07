@@ -36,7 +36,7 @@ type response struct {
 // checkResponse checks a response on which you can have expectations.
 // Any failed expectation will be logged on the logger.
 func checkResponse(test *test, logger testsuite.Logger, resp *http.Response, body []byte) {
-	if resp.StatusCode != test.statusCode {
+	if resp.StatusCode != test.statusCode && test.statusCode >= 0 {
 		str := string(body)
 		if len(str) > maxErrorBodySize {
 			str = fmt.Sprintf("%s... (%d)", str[:maxErrorBodySize], len(str))
