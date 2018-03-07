@@ -105,7 +105,7 @@ func (t *test) Run(ctx context.Context, logger testsuite.Logger) {
 	h := &handler{reqs: t.req.msgs}
 	err := grpcurl.InvokeRpc(ctx, t.descSource, t.cc, t.req.methodName, t.req.headers, h, h.getRequestData)
 	if err != nil {
-		logger.Errorf("could not invoking method: %v", err)
+		logger.Errorf("could not invoke method: %v", err)
 		return
 	}
 	if got, want := h.status.Code(), t.expect.code; got != want {

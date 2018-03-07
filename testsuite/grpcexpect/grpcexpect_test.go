@@ -8,14 +8,14 @@ import (
 	"net"
 	"testing"
 
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/blippar/aragorn/testsuite/grpcexpect/grpctesting"
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestNewProtoset(t *testing.T) {
@@ -166,10 +166,10 @@ func TestNewReflect(t *testing.T) {
 		nil,
 		{`wrong value for header "hello" (got "123"; want "world")`},
 		{"wrong response\ngot: message:\"Hello test!\"\nwant: message:\"Hello world!\""},
-		{`could not invoking method: could not parse given request body as message of type "grpcexpect.testing.SimpleRequest": Message type grpcexpect.testing.SimpleRequest has no known field named invalid_field`},
+		{`could not invoke method: could not parse given request body as message of type "grpcexpect.testing.SimpleRequest": Message type grpcexpect.testing.SimpleRequest has no known field named invalid_field`},
 		{`could not unmarshal expected document: Message type grpcexpect.testing.SimpleResponse has no known field named test`},
 		{"wrong number of response (got 1; want 2)"},
-		{`could not invoking method: target server does not expose service "invalid_service"`},
+		{`could not invoke method: target server does not expose service "invalid_service"`},
 	}
 	checkSuite(t, cfg, testsErrs)
 }

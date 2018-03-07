@@ -154,13 +154,13 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 #### HTTPExpect
 
-| Name       | Type                | Description                                                            |
-| ---------- | ------------------- | ---------------------------------------------------------------------- |
-| statusCode | `int`               | Expected HTTP status code. Not check if the value is -1 (default: 200) |
-| header     | `map[string]string` | Expected key-value pairs in the HTTP header.                           |
-| document   | `HTTPDocument`      | Expected document to be returned.                                      |
-| jsonSchema | `HTTPObject`        | Expected JSON schema (1) to be returned.                               |
-| jsonValues | `HTTPObject`        | Expected Specific JSON values to be returned.                          |
+| Name       | Type                | Description                                                              |
+| ---------- | ------------------- | ------------------------------------------------------------------------ |
+| statusCode | `int`               | Expected HTTP status code. Not checked if the value is -1 (default: 200) |
+| header     | `map[string]string` | Expected key-value pairs in the HTTP header.                             |
+| document   | `HTTPDocument`      | Expected document to be returned.                                        |
+| jsonSchema | `HTTPObject`        | Expected JSON schema (1) to be returned.                                 |
+| jsonValues | `HTTPObject`        | Expected Specific JSON values to be returned.                            |
 
 1.  See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
 
@@ -273,7 +273,7 @@ An GRPC test suite contains a base configuration and list of tests.
 | ------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | address            | `string`       | **REQUIRED**. target address for the connection to the server.                                                                 |
 | protoSetPath       | `string`       | The path of a file containing an encoded FileDescriptorSet. (default: get the remote server proto via the GRPC reflection API) |
-| tls                | `bool`         | TLS connection to the server (default: use plain-text HTTP/2)                                                                  |
+| tls                | `bool`         | TLS connection to the server. If false, use plain-text HTTP/2 (default: false)                                                 |
 | caPath             | `string`       | File containing trusted root certificates for verifying the server.                                                            |
 | serverHostOverride | `string`       | Override the virtual host name of authority (e.g. :authority header field) in requests.                                        |
 | insecure           | `bool`         | Skip server certificate and domain verification.                                                                               |
@@ -295,15 +295,15 @@ An GRPC test suite contains a base configuration and list of tests.
 | -------- | ------------------- | -------------------------------------------------------------------------------------------- |
 | method   | `string`            | **REQUIRED**. GRPC method of the request. (e.g. `grpcexpect.testing.TestService/SimpleCall`) |
 | header   | `map[string]string` | List of request header fields.                                                               |
-| document | `GRPCDocument`      | Request GRPC.                                                                                |
+| document | `GRPCDocument`      | Expected request message of the GRPC method.                                                 |
 
 #### GRPCExpect
 
-| Name     | Type                | Description                                  |
-| -------- | ------------------- | -------------------------------------------- |
-| Code     | `string`            | Expected GRPC code. (default: `OK`)          |
-| header   | `map[string]string` | Expected key-value pairs in the GRPC header. |
-| document | `GRPCDocument`      | Expected response document.                  |
+| Name     | Type                | Description                                   |
+| -------- | ------------------- | --------------------------------------------- |
+| Code     | `string`            | Expected GRPC code. (default: `OK`)           |
+| header   | `map[string]string` | Expected key-value pairs in the GRPC header.  |
+| document | `GRPCDocument`      | Expected response message of the GRPC method. |
 
 #### GRPCDocument
 
