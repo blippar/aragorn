@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -53,7 +54,7 @@ func main() {
 
 func run() int {
 	// Build the list of available commands.
-	commands := [...]command{
+	commands := []command{
 		&initCommand{},
 		&listCommand{},
 		&execCommand{},
@@ -86,70 +87,84 @@ func run() int {
 		return errorExitCode
 	}
 
-	for _, cmd := range commands {
-		if cmd.Name() == cmdName {
-			// Build flag set with global flags in there.
-			fs := flag.NewFlagSet(cmdName, flag.ContinueOnError)
-			fs.SetOutput(os.Stderr)
-			debug := fs.Bool("debug", false, "Enable debug mode")
-			logLevel := fs.String("log-level", "info", `Set the logging level ("debug"|"info"|"warn"|"error"|"fatal")`)
-			httpLAddr := fs.String("http-laddr", "", "Set the http listen address for tracing, metrics, expvar...")
-			tracer := fs.String("tracer", "", `Set the tracer ("basic"|"jaeger")`)
-			tracerAddr := fs.String("tracer-addr", "localhost:6831", "Set the tracer address")
+	cmd, ok := getCommandFromName(cmdName, commands)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "aragorn: %s: no such command\n", cmdName)
+		usage(os.Stderr)
+		return errorExitCode
+	}
 
-			// Register the subcommand flags in there, too.
-			cmd.Register(fs)
+	// Build flag set with global flags in there.
+	fs := flag.NewFlagSet(cmdName, flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
 
-			// Override the usage text to something nicer.
-			resetUsage(os.Stderr, fs, cmdName, cmd.Args(), cmd.LongHelp())
+	flagDebug := fs.Bool("debug", false, "Enable debug mode")
+	flagLogLevel := fs.String("log-level", "info", `Set the logging level ("debug"|"info"|"warn"|"error"|"fatal")`)
+	flagHTTP := fs.String("http", "", "Present the web based UI (tracing, metrics, expvar...) at the specified http host:port")
+	flagTracer := fs.String("tracer", "", `Set the tracer ("basic"|"jaeger")`)
+	flagTracerAddr := fs.String("tracer-addr", "localhost:6831", "Set the tracer address")
 
-			if printCommandHelp {
-				fs.Usage()
-				return errorExitCode
-			}
+	// Register the subcommand flags in there, too.
+	cmd.Register(fs)
 
-			// Parse the flags the user gave us.
-			// flag package automatically prints usage and error message in err != nil
-			// or if '-h' flag provided
-			if err := fs.Parse(os.Args[2:]); err != nil {
-				return errorExitCode
-			}
+	// Override the usage text to something nicer.
+	resetUsage(os.Stderr, fs, cmdName, cmd.Args(), cmd.LongHelp())
 
-			if err := log.Init(*logLevel, *debug); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				return errorExitCode
-			}
-			defer log.L().Sync()
+	if printCommandHelp {
+		fs.Usage()
+		return errorExitCode
+	}
 
-			switch *tracer {
-			case "basic":
-				newBasicTracer()
-			case "jaeger":
-				defer newJaegerTracer(*tracerAddr).Close()
-			}
+	// Parse the flags the user gave us.
+	// flag package automatically prints usage and error message in err != nil
+	// or if '-h' flag provided
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		return errorExitCode
+	}
 
-			if *httpLAddr != "" {
-				go func() {
-					if err := http.ListenAndServe(*httpLAddr, nil); err != nil {
-						log.Error("http server failure", zap.Error(err))
-					}
-				}()
-			}
+	if err := log.Init(*flagLogLevel, *flagDebug); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return errorExitCode
+	}
+	defer log.L().Sync()
 
-			// Run the command with the post-flag-processing args.
-			if err := cmd.Run(fs.Args()); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				return errorExitCode
-			}
-
-			// Easy peasy livin' breezy.
-			return successExitCode
+	if *flagTracer != "" {
+		switch *flagTracer {
+		case "basic":
+			newBasicTracer()
+		case "jaeger":
+			defer newJaegerTracer(*flagTracerAddr).Close()
+		default:
+			fmt.Fprintf(os.Stderr, "unrecognized tracer: %q\n", *flagTracer)
+			return errorExitCode
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "aragorn: %s: no such command\n", cmdName)
-	usage(os.Stderr)
-	return errorExitCode
+	if *flagHTTP != "" {
+		go func() {
+			if err := http.ListenAndServe(*flagHTTP, nil); err != nil {
+				log.Error("http server failure", zap.Error(err))
+			}
+		}()
+	}
+
+	// Run the command with the post-flag-processing args.
+	if err := cmd.Run(fs.Args()); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return errorExitCode
+	}
+
+	// Easy peasy livin' breezy.
+	return successExitCode
+}
+
+func getCommandFromName(name string, cmds []command) (command, bool) {
+	for _, cmd := range cmds {
+		if cmd.Name() == name {
+			return cmd, true
+		}
+	}
+	return nil, false
 }
 
 func resetUsage(w io.Writer, fs *flag.FlagSet, name, args, longHelp string) {
