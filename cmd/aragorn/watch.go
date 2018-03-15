@@ -86,7 +86,7 @@ func (cmd *watchCommand) fsWatchEventLoop(events <-chan fsnotify.Event, argFiles
 
 func (cmd *watchCommand) runSuiteFromFile(path string) {
 	ctx := context.Background()
-	s, err := server.NewSuiteFromFile(path, cmd.failfast)
+	s, err := server.NewSuiteFromFile(path, server.FailFast(cmd.failfast))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v", path, err)
 		return

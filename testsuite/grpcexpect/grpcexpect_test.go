@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/blippar/aragorn/testsuite"
 	"github.com/blippar/aragorn/testsuite/grpcexpect/grpctesting"
 )
 
@@ -27,7 +28,7 @@ func TestNewProtoset(t *testing.T) {
 	cfg := &Config{
 		Address:      l.Addr().String(),
 		ProtoSetPath: "./grpctesting/test.protoset",
-		Header:       Header{"hello": "world"},
+		Header:       testsuite.Header{"hello": "world"},
 		Tests: []TestConfig{
 			{
 				Name:    "Empty Call",
@@ -42,7 +43,7 @@ func TestNewProtoset(t *testing.T) {
 				},
 				Expect: ExpectConfig{
 					Code:     codes.OK,
-					Header:   Header{"hello": "world"},
+					Header:   testsuite.Header{"hello": "world"},
 					Document: map[string]interface{}{"message": "Hello world!"},
 				},
 			},
@@ -82,18 +83,18 @@ func TestNewReflect(t *testing.T) {
 			{
 				Name:    "Empty Call with missing header",
 				Request: RequestConfig{Method: "grpcexpect.testing.TestService.EmptyCall"},
-				Expect:  ExpectConfig{Code: codes.OK, Header: Header{"test": "123"}},
+				Expect:  ExpectConfig{Code: codes.OK, Header: testsuite.Header{"test": "123"}},
 			},
 			{
 				Name: "Simple Call",
 				Request: RequestConfig{
 					Method:   "grpcexpect.testing.TestService/SimpleCall",
-					Header:   Header{"hello": "world"},
+					Header:   testsuite.Header{"hello": "world"},
 					Document: map[string]interface{}{"username": "world"},
 				},
 				Expect: ExpectConfig{
 					Code:     codes.OK,
-					Header:   Header{"hello": "world"},
+					Header:   testsuite.Header{"hello": "world"},
 					Document: map[string]interface{}{"message": "Hello world!"},
 				},
 			},
@@ -101,12 +102,12 @@ func TestNewReflect(t *testing.T) {
 				Name: "Simple Call with invalid response header",
 				Request: RequestConfig{
 					Method:   "grpcexpect.testing.TestService.SimpleCall",
-					Header:   Header{"hello": "123"},
+					Header:   testsuite.Header{"hello": "123"},
 					Document: map[string]interface{}{"username": "world"},
 				},
 				Expect: ExpectConfig{
 					Code:     codes.OK,
-					Header:   Header{"hello": "world"},
+					Header:   testsuite.Header{"hello": "world"},
 					Document: map[string]interface{}{"message": "Hello world!"},
 				},
 			},

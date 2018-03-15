@@ -3,7 +3,9 @@ package plugin
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -56,6 +58,7 @@ func registrationURI(t Type, id string) string {
 // InitContext is used for plugin inititalization
 type InitContext struct {
 	Config interface{}
+	Path   string
 	Root   string
 }
 
@@ -80,17 +83,31 @@ func Register(r *Registration) {
 	register.r[uri] = r
 }
 
-func NewContext(r *Registration, root string) *InitContext {
+func NewContext(r *Registration, path string) *InitContext {
 	cfgType := reflect.TypeOf(r.Config).Elem()
 	return &InitContext{
 		Config: reflect.New(cfgType).Interface(),
-		Root:   root,
+		Path:   path,
+		Root:   filepath.Dir(path),
 	}
 }
 
 func Get(t Type, id string) *Registration {
-	register.Lock()
-	defer register.Unlock()
+	register.RLock()
+	defer register.RUnlock()
 	uri := registrationURI(t, id)
 	return register.r[uri]
+}
+
+func ForType(t Type) []*Registration {
+	register.RLock()
+	defer register.RUnlock()
+	tStr := t.String()
+	var rs []*Registration
+	for k, r := range register.r {
+		if strings.HasPrefix(k, tStr) {
+			rs = append(rs, r)
+		}
+	}
+	return rs
 }

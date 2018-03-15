@@ -6,15 +6,15 @@ import (
 )
 
 type jsonGoLoader struct {
-	source interface{}
+	doc interface{}
 }
 
-func newJSONGoLoader(source interface{}) *jsonGoLoader {
-	return &jsonGoLoader{source: source}
+func newJSONGoLoader(doc interface{}) *jsonGoLoader {
+	return &jsonGoLoader{doc: doc}
 }
 
 func (l *jsonGoLoader) JsonSource() interface{} {
-	return l.source
+	return l.doc
 }
 
 func (l *jsonGoLoader) JsonReference() (gojsonreference.JsonReference, error) {
@@ -22,9 +22,15 @@ func (l *jsonGoLoader) JsonReference() (gojsonreference.JsonReference, error) {
 }
 
 func (l *jsonGoLoader) LoaderFactory() gojsonschema.JSONLoaderFactory {
-	return &gojsonschema.DefaultJSONLoaderFactory{}
+	return JSONLoaderFactory{}
 }
 
 func (l *jsonGoLoader) LoadJSON() (interface{}, error) {
-	return l.source, nil
+	return l.doc, nil
+}
+
+type JSONLoaderFactory struct{}
+
+func (JSONLoaderFactory) New(source string) gojsonschema.JSONLoader {
+	return gojsonschema.NewReferenceLoader(source)
 }

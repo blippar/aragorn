@@ -16,8 +16,8 @@ import (
 
 const (
 	infoColor   = "good"
-	warnColor   = "warning"
 	dangerColor = "danger"
+	// warnColor   = "warning"
 )
 
 type notification struct {
@@ -58,17 +58,7 @@ type Config struct {
 	Verbose  bool   `json:"verbose,omitempty"`
 }
 
-// New returns a new Notifier given a Slack webhook and a test suite name.
-func New(webhook, username, channel string) *Notifier {
-	cfg := &Config{
-		Webhook:  webhook,
-		Username: username,
-		Channel:  channel,
-	}
-	return NewFromConfig(cfg)
-}
-
-func NewFromConfig(cfg *Config) *Notifier {
+func New(cfg *Config) *Notifier {
 	return &Notifier{
 		cfg: cfg,
 	}
@@ -80,7 +70,7 @@ func (sn *Notifier) Notify(r *notifier.Report) {
 	for _, tr := range r.TestReports {
 		errors += len(tr.Errs)
 	}
-	extra := ""
+	var extra string
 	if errors == 0 {
 		if !sn.cfg.Verbose {
 			return
@@ -92,12 +82,12 @@ func (sn *Notifier) Notify(r *notifier.Report) {
 		extra = fmt.Sprintf("%d tests failed", errors)
 	}
 	if r.Suite.FailFast() {
-		extra += " (fail fast)"
+		extra += " (failfast)"
 	}
 	notif := &notification{
 		Username: sn.cfg.Username,
 		Channel:  sn.cfg.Channel,
-		Text:     fmt.Sprintf("*%s* - %s", r.Suite.Name(), extra),
+		Text:     fmt.Sprintf("*%s* - %s - %s", r.Suite.Name(), r.Suite.Type(), extra),
 	}
 	for _, tr := range r.TestReports {
 		color := dangerColor
@@ -167,7 +157,7 @@ func init() {
 		Config: (*Config)(nil),
 		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
 			cfg := ctx.Config.(*Config)
-			return NewFromConfig(cfg), nil
+			return New(cfg), nil
 		},
 	})
 }

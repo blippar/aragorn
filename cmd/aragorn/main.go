@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -14,6 +13,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/blippar/aragorn/log"
+
+	_ "expvar"
+	_ "net/http/pprof"
 
 	_ "github.com/blippar/aragorn/notifier/slack"
 	_ "github.com/blippar/aragorn/testsuite/grpcexpect"
@@ -150,7 +152,9 @@ func run() int {
 
 	// Run the command with the post-flag-processing args.
 	if err := cmd.Run(fs.Args()); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if err != errSomethingWentWrong {
+			fmt.Fprintln(os.Stderr, err)
+		}
 		return errorExitCode
 	}
 
