@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -28,6 +29,8 @@ const (
 	successExitCode = 0
 	errorExitCode   = 1
 )
+
+var errSomethingWentWrong = errors.New("something went wrong")
 
 const fileHelp = `
 

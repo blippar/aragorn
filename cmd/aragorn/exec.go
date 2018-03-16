@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -16,8 +15,6 @@ import (
 
 const execShortHelp = `Execute the test suites`
 const execLongHelp = `Execute the test suites` + fileHelp
-
-var errSomethingWentWrong = errors.New("something went wrong")
 
 type execCommand struct {
 	config   string
