@@ -2,7 +2,6 @@ package httpexpect
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -10,6 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/blippar/aragorn/pkg/util/json"
+	"github.com/blippar/aragorn/testsuite"
 )
 
 // toHTTPRequest returns an http.Request from a base and a request.
@@ -36,12 +38,18 @@ func (req *Request) toHTTPRequest(cfg *Config) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Base.Header.toHTTPRequest(httpReq)
-	req.Header.toHTTPRequest(httpReq)
+	setHeaderinHTTPRequest(cfg.Base.Header, httpReq)
+	setHeaderinHTTPRequest(req.Header, httpReq)
 	if cntType != "" && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", cntType)
 	}
 	return httpReq, nil
+}
+
+func setHeaderinHTTPRequest(h testsuite.Header, req *http.Request) {
+	for k, v := range h {
+		req.Header.Set(k, v)
+	}
 }
 
 func (req *Request) getBody(cfg *Config) (io.Reader, string, error) {

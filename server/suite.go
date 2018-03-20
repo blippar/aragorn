@@ -2,11 +2,10 @@ package server
 
 import (
 	"context"
-	"encoding/json"
+	gojson "encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	ot "github.com/opentracing/opentracing-go"
@@ -17,167 +16,151 @@ import (
 
 	"github.com/blippar/aragorn/log"
 	"github.com/blippar/aragorn/notifier"
+	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
 
 type Suite struct {
-	path     string
-	name     string
-	typ      string
-	failfast bool
-
-	runCron  string
-	runEvery time.Duration
-
+	path       string
+	name       string
+	typ        string
+	runCron    string
+	runEvery   time.Duration
 	retryCount int
 	retryWait  time.Duration
 	timeout    time.Duration
-
-	ts testsuite.Suite
+	failfast   bool
+	tests      []testsuite.Test
 }
 
 func (s *Suite) Path() string            { return s.path }
 func (s *Suite) Name() string            { return s.name }
 func (s *Suite) Type() string            { return s.typ }
 func (s *Suite) FailFast() bool          { return s.failfast }
-func (s *Suite) Tests() []testsuite.Test { return s.ts.Tests() }
+func (s *Suite) Tests() []testsuite.Test { return s.tests }
 
 type SuiteConfig struct {
-	Path       string          `json:"path,omitempty"`     // only used in base config.
-	Name       string          `json:"name,omitempty"`     // identifier for this test suite
-	RunEvery   duration        `json:"runEvery,omitempty"` // scheduling every duration.
-	RunCron    string          `json:"runCron,omitempty"`  // cron string.
-	RetryCount int             `json:"retryCount,omitempty"`
-	RetryWait  duration        `json:"retryWait,omitempty"`
-	Timeout    duration        `json:"timeout,omitempty"`
-	FailFast   bool            `json:"failFast,omitempty"` // stop after first test failure.
-	Type       string          `json:"type,omitempty"`     // type of the test suite, can be HTTP, GRPC...
-	Suite      json.RawMessage `json:"suite,omitempty"`    // description of the test suite, depends on Type.
+	Path string `json:"path,omitempty"` // only used in base config.
+
+	Name       string        `json:"name,omitempty"`     // identifier for this test suite
+	RunEvery   json.Duration `json:"runEvery,omitempty"` // scheduling every duration.
+	RunCron    string        `json:"runCron,omitempty"`  // cron string.
+	RetryCount int           `json:"retryCount,omitempty"`
+	RetryWait  json.Duration `json:"retryWait,omitempty"`
+	Timeout    json.Duration `json:"timeout,omitempty"`
+	FailFast   bool          `json:"failFast,omitempty"` // stop after first test failure.
+
+	Type  string            `json:"type,omitempty"`  // type of the test suite, can be HTTP, GRPC...
+	Suite gojson.RawMessage `json:"suite,omitempty"` // description of the test suite, depends on Type.
+
+	baseSuite []byte
+	filter    string
 }
 
-func NewSuiteFromReader(r io.Reader, failfast bool, baseSuite json.RawMessage) (*Suite, error) {
+type namer interface {
+	Name() string
+}
+
+func NewSuite(path, typ string, tests []testsuite.Test, cfg *SuiteConfig) (*Suite, error) {
+	s := &Suite{
+		path:  path,
+		typ:   typ,
+		tests: tests,
+	}
+	if err := s.applyConfig(cfg); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func NewSuiteFromReader(r io.Reader, options ...SuiteOption) (*Suite, error) {
 	cfg := &SuiteConfig{
 		RetryCount: 1,
-		RetryWait:  duration(1 * time.Second),
-		Timeout:    duration(30 * time.Second),
+		RetryWait:  json.Duration(1 * time.Second),
+		Timeout:    json.Duration(30 * time.Second),
 	}
-	if err := decodeReaderJSON(r, cfg); err != nil {
-		return nil, fmt.Errorf("could not decode suite: %v", jsonDecodeError(r, err))
+	if err := json.Decode(r, cfg); err != nil {
+		return nil, fmt.Errorf("could not decode suite: %v", err)
 	}
+	cfg.applyOptions(options...)
 	reg := plugin.Get(plugin.TestSuitePlugin, cfg.Type)
 	if reg == nil {
 		return nil, fmt.Errorf("unsupported test suite type: %q", cfg.Type)
 	}
-	path, root := "", ""
+	path := ""
 	if n, ok := r.(namer); ok {
 		path = n.Name()
-		root = filepath.Dir(path)
 	}
-	ic := plugin.NewContext(reg, root)
-	if err := decodeJSON(cfg.Suite, ic.Config); err != nil {
-		return nil, fmt.Errorf("could not decode test suite: %v", jsonDecodeError(nil, err))
+	ic := plugin.NewContext(reg, path)
+	if err := json.Unmarshal(cfg.Suite, ic.Config); err != nil {
+		return nil, fmt.Errorf("could not decode test suite: %v", err)
 	}
-	if baseSuite != nil {
-		if err := decodeJSON(baseSuite, ic.Config); err != nil {
-			return nil, fmt.Errorf("could not decode base test suite: %v", jsonDecodeError(nil, err))
+	if cfg.baseSuite != nil {
+		if err := json.Unmarshal(cfg.baseSuite, ic.Config); err != nil {
+			return nil, fmt.Errorf("could not decode base test suite: %v", err)
 		}
 	}
 	suite, err := reg.Init(ic)
 	if err != nil {
 		return nil, err
 	}
-	s := &Suite{
-		path:     path,
-		failfast: failfast,
-		typ:      cfg.Type,
-		ts:       suite.(testsuite.Suite),
-	}
-	s.fromConfig(cfg)
-	return s, nil
+	ts := suite.(testsuite.Suite)
+	return NewSuite(path, cfg.Type, ts.Tests(), cfg)
 }
 
-func NewSuiteFromFile(path string, failfast bool) (*Suite, error) {
+func NewSuiteFromFile(path string, options ...SuiteOption) (*Suite, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open suite file: %v", err)
 	}
 	defer f.Close()
-	return NewSuiteFromReader(f, failfast, nil)
-}
-
-func (baseCfg *SuiteConfig) GenSuite(failfast bool) (*Suite, error) {
-	f, err := os.Open(baseCfg.Path)
-	if err != nil {
-		return nil, fmt.Errorf("could not open suite file: %v", err)
-	}
-	defer f.Close()
-	s, err := NewSuiteFromReader(f, failfast, baseCfg.Suite)
-	if err != nil {
-		return nil, err
-	}
-	s.fromConfig(baseCfg)
-	return s, nil
-}
-
-func (s *Suite) fromConfig(cfg *SuiteConfig) {
-	if cfg.Name != "" {
-		s.name = cfg.Name
-	}
-	if cfg.RunEvery > 0 {
-		s.runEvery = time.Duration(cfg.RunEvery)
-	}
-	if cfg.RunCron != "" {
-		s.runCron = cfg.RunCron
-	}
-	s.failfast = s.failfast || cfg.FailFast
-	if cfg.RetryCount > 0 {
-		s.retryCount = cfg.RetryCount
-	}
-	if cfg.RetryWait > 0 {
-		s.retryWait = time.Duration(cfg.RetryWait)
-	}
-	if cfg.Timeout > 0 {
-		s.timeout = time.Duration(cfg.Timeout)
-	}
+	return NewSuiteFromReader(f, options...)
 }
 
 func (s *Suite) Run(ctx context.Context) *notifier.Report {
 	log.Info("running suite", zap.String("file", s.path), zap.String("suite", s.name), zap.String("type", s.typ))
-
 	span, ctx := ot.StartSpanFromContext(ctx, s.name)
 	defer span.Finish()
-
-	report := notifier.NewReport(s)
-
-	for _, t := range s.ts.Tests() {
-		ok := s.runTestWithRetry(ctx, t, report)
-		if (s.failfast && !ok) || ctx.Err() != nil {
-			span.SetTag("failfast", true)
-			break
-		}
-	}
-
-	report.Done()
-
+	report := s.runTests(ctx, span)
 	log.Info("test suite done",
 		zap.String("suite", s.name),
 		zap.Bool("failfast", s.failfast),
-		zap.Int("nb_tests", len(s.Tests())),
+		zap.Int("nb_tests", len(s.tests)),
 		zap.Int("nb_test_reports", len(report.TestReports)),
 		zap.Int("nb_failed", report.NbFailed),
 		zap.Time("started_at", report.Start),
 		zap.Duration("duration", report.Duration),
 	)
+	return report
+}
 
+func (s *Suite) runTests(ctx context.Context, span ot.Span) *notifier.Report {
+	report := notifier.NewReport(s)
+	defer report.Done()
+	for _, t := range s.tests {
+		ok := s.runTestWithRetry(ctx, t, report)
+		if !ok {
+			report.NbFailed++
+			if s.failfast {
+				span.SetTag("failfast", true)
+				break
+			}
+		}
+		if ctx.Err() != nil {
+			break
+		}
+	}
 	return report
 }
 
 // runTestWithRetry will try to run the test t up to n times, waiting for n * wait time
 // in between each try.
 func (s *Suite) runTestWithRetry(ctx context.Context, t testsuite.Test, r *notifier.Report) bool {
+	tr := r.NewTestReport(t)
+	defer tr.Done()
 	for attempt := 1; ; attempt++ {
-		if ok := s.runTest(ctx, t, r); ok {
+		if ok := s.runTest(ctx, t, tr); ok {
 			return ok
 		}
 		if attempt >= s.retryCount {
@@ -188,23 +171,22 @@ func (s *Suite) runTestWithRetry(ctx context.Context, t testsuite.Test, r *notif
 			return false
 		case <-time.After(s.retryWait):
 		}
+		log.Info("test retry", zap.String("name", t.Name()), zap.Int("attempt", attempt+1), zap.Int("max_attempts", s.retryCount))
+		tr.Reset()
 	}
 }
 
-func (s *Suite) runTest(ctx context.Context, t testsuite.Test, r *notifier.Report) bool {
+func (s *Suite) runTest(ctx context.Context, t testsuite.Test, tr *notifier.TestReport) bool {
 	log.Info("running test", zap.String("name", t.Name()), zap.String("description", t.Description()))
 
 	span, ctx := ot.StartSpanFromContext(ctx, t.Name())
 	defer span.Finish()
-
-	tr := r.NewTestReport(t)
 
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
 	t.Run(ctx, tr)
 
-	tr.Done()
 	fields := []zapcore.Field{
 		zap.String("name", t.Name()),
 		zap.Time("started_at", tr.Start),
@@ -212,32 +194,19 @@ func (s *Suite) runTest(ctx context.Context, t testsuite.Test, r *notifier.Repor
 	}
 	ok := len(tr.Errs) == 0
 	if !ok {
-		r.NbFailed++
-		otext.Error.Set(span, true)
-
 		errs := make([]string, len(tr.Errs))
+		otfields := make([]otlog.Field, len(tr.Errs))
 		for i, err := range tr.Errs {
 			str := err.Error()
 			errs[i] = str
-			span.LogFields(otlog.String("event", str))
+			otfields[i] = otlog.String("error", str)
 		}
 		fields = append(fields, zap.Strings("errors", errs))
 		log.Warn("test failed", fields...)
+		otext.Error.Set(span, true)
+		span.LogFields(otfields...)
 	} else {
 		log.Info("test passed", fields...)
 	}
 	return ok
-}
-
-type suiteRunner struct {
-	s *Suite
-	n notifier.Notifier
-}
-
-func (sr *suiteRunner) Run() {
-	ctx := context.Background()
-	r := sr.s.Run(ctx)
-	if sr.n != nil {
-		sr.n.Notify(r)
-	}
 }

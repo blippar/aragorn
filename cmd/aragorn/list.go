@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"os"
 	"text/tabwriter"
+
+	"github.com/blippar/aragorn/server"
 )
 
 const listShortHelp = `List the test suites`
 const listLongHelp = `List the test suites` + fileHelp
 
-type listCommand struct{}
+type listCommand struct {
+	filter string
+}
 
 func (*listCommand) Name() string { return "list" }
 func (*listCommand) Args() string {
@@ -20,10 +24,12 @@ func (*listCommand) ShortHelp() string { return listShortHelp }
 func (*listCommand) LongHelp() string  { return listLongHelp }
 func (*listCommand) Hidden() bool      { return false }
 
-func (*listCommand) Register(fs *flag.FlagSet) {}
+func (cmd *listCommand) Register(fs *flag.FlagSet) {
+	fs.StringVar(&cmd.filter, "filter", "", "List only the tests that match the regular expression")
+}
 
-func (*listCommand) Run(args []string) error {
-	suites, err := getSuitesFromArgs(args, false)
+func (cmd *listCommand) Run(args []string) error {
+	suites, err := getSuitesFromArgs(args, server.Filter(cmd.filter))
 	if err != nil {
 		return err
 	}

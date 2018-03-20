@@ -2,7 +2,6 @@ package grpcexpect
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"reflect"
@@ -23,6 +22,7 @@ import (
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
 
+	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/plugin"
 	"github.com/blippar/aragorn/testsuite"
 )
@@ -46,7 +46,7 @@ func New(cfg *Config) (*Suite, error) {
 		grpc.WithStreamInterceptor(otgrpc.StreamClientInterceptor()),
 		tcOpt,
 	}
-	if cfg.OAUTH2.ClientID != "" && cfg.OAUTH2.ClientSecret != "" {
+	if cfg.OAUTH2 != nil {
 		httpClient := &http.Client{Transport: &nethttp.Transport{}}
 		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, httpClient)
 		ts := &oauth.TokenSource{TokenSource: cfg.OAUTH2.TokenSource(ctx)}
@@ -94,7 +94,7 @@ type request struct {
 
 type expect struct {
 	code   codes.Code
-	header Header
+	header testsuite.Header
 	msgs   [][]byte
 }
 
@@ -185,7 +185,8 @@ func init() {
 		Config: (*Config)(nil),
 		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
 			cfg := ctx.Config.(*Config)
-			cfg.Path = ctx.Root
+			cfg.Path = ctx.Path
+			cfg.Root = ctx.Root
 			return New(cfg)
 		},
 	})

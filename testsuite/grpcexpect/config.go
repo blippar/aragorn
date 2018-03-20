@@ -1,13 +1,10 @@
 package grpcexpect
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -18,67 +15,62 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/testsuite"
 )
 
 type Config struct {
-	Path string
-
-	Address      string
-	ProtoSetPath string
-
-	TLS                bool
-	CAPath             string
-	ServerHostOverride string
-	Insecure           bool
-	OAUTH2             clientcredentials.Config
-
-	Header Header
-
-	Tests []TestConfig
+	Path               string                    `json:"path,omitempty"`
+	Root               string                    `json:"root,omitempty"`
+	Address            string                    `json:"address,omitempty"`
+	ProtoSetPath       string                    `json:"protoSetPath,omitempty"`
+	TLS                bool                      `json:"tls,omitempty"`
+	CAPath             string                    `json:"caPath,omitempty"`
+	ServerHostOverride string                    `json:"serverHostOverride,omitempty"`
+	Insecure           bool                      `json:"insecure,omitempty"`
+	OAUTH2             *clientcredentials.Config `json:"oauth2,omitempty"`
+	Header             testsuite.Header          `json:"header,omitempty"`
+	Tests              []TestConfig              `json:"tests,omitempty"`
 }
 
 type TestConfig struct {
-	Name    string
-	Request RequestConfig
-	Expect  ExpectConfig
+	Name    string        `json:"name,omitempty"`
+	Request RequestConfig `json:"request,omitempty"`
+	Expect  ExpectConfig  `json:"expect,omitempty"`
 }
 
 type RequestConfig struct {
-	Method   string
-	Header   Header
-	Document interface{}
+	Method   string           `json:"method,omitempty"`
+	Header   testsuite.Header `json:"header,omitempty"`
+	Document interface{}      `json:"document,omitempty"`
 }
 
 type ExpectConfig struct {
-	Code     codes.Code
-	Header   Header
-	Document interface{}
+	Code     codes.Code       `json:"code,omitempty"`
+	Header   testsuite.Header `json:"header,omitempty"`
+	Document interface{}      `json:"document,omitempty"`
 }
 
-// A Header represents the key-value pairs in an GRPC header.
-type Header map[string]string
-
-func mergeHeaders(hs ...Header) Header {
-	res := make(Header)
-	for _, h := range hs {
-		res.copy(h)
+func (*Config) Example() interface{} {
+	return &Config{
+		Address:  "localhost:50051",
+		Insecure: true,
+		Tests: []TestConfig{
+			{
+				Name: "Simple Call",
+				Request: RequestConfig{
+					Method:   "grpcexpect.testing.TestService/SimpleCall",
+					Header:   testsuite.Header{"hello": "world"},
+					Document: map[string]interface{}{"username": "world"},
+				},
+				Expect: ExpectConfig{
+					Code:     codes.OK,
+					Header:   testsuite.Header{"hello": "world"},
+					Document: map[string]interface{}{"message": "Hello world!"},
+				},
+			},
+		},
 	}
-	return res
-}
-
-func (h Header) copy(src Header) {
-	for k, v := range src {
-		h[k] = v
-	}
-}
-
-func (h Header) slice() []string {
-	res := make([]string, 0, len(h))
-	for k, v := range h {
-		res = append(res, k+":"+v)
-	}
-	return res
 }
 
 func (cfg *Config) genTests(cc *grpc.ClientConn, descSource grpcurl.DescriptorSource) ([]testsuite.Test, error) {
@@ -99,12 +91,12 @@ func (cfg *Config) genTests(cc *grpc.ClientConn, descSource grpcurl.DescriptorSo
 			description: fmt.Sprintf("grpc://%s/%s", cfg.Address, tcfg.Request.Method),
 			req: request{
 				methodName: tcfg.Request.Method,
-				headers:    mergeHeaders(cfg.Header, tcfg.Request.Header).slice(),
+				headers:    testsuite.MergeHeaders(cfg.Header, tcfg.Request.Header).Slice(),
 				msgs:       reqMsgs,
 			},
 			expect: expect{
 				code:   tcfg.Expect.Code,
-				header: mergeHeaders(tcfg.Expect.Header),
+				header: testsuite.MergeHeaders(tcfg.Expect.Header),
 				msgs:   expMsgs,
 			},
 		}
@@ -128,7 +120,7 @@ func (cfg *Config) getDocumentField(v interface{}) (interface{}, error) {
 	}
 	defer f.Close()
 	var newVal interface{}
-	err = decodeReaderJSON(f, &newVal)
+	err = json.Decode(f, &newVal)
 	return newVal, err
 }
 
@@ -136,7 +128,7 @@ func (cfg *Config) getFilePath(path string) string {
 	if filepath.IsAbs(path) {
 		return path
 	}
-	return filepath.Join(cfg.Path, path)
+	return filepath.Join(cfg.Root, path)
 }
 
 func (cfg *Config) transportDialOption() (grpc.DialOption, error) {
@@ -180,14 +172,4 @@ func newDocToMsgs(doc interface{}) ([][]byte, error) {
 		res[i], _ = json.Marshal(v)
 	}
 	return res, nil
-}
-
-func decodeReaderJSON(r io.Reader, v interface{}) error {
-	decoder := json.NewDecoder(r)
-	decoder.UseNumber()
-	return decoder.Decode(v)
-}
-
-func decodeJSON(b []byte, v interface{}) error {
-	return decodeReaderJSON(bytes.NewReader(b), v)
 }
