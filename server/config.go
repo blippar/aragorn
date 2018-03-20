@@ -23,7 +23,7 @@ type Config struct {
 	dir       string
 }
 
-func NewConfigFromReader(r io.Reader, options ...SuiteOption) (*Config, error) {
+func NewConfigFromReader(r io.Reader) (*Config, error) {
 	cfg := &Config{}
 	if err := json.Decode(r, cfg); err != nil {
 		return nil, fmt.Errorf("could not decode config: %v", err)
@@ -35,7 +35,7 @@ func NewConfigFromReader(r io.Reader, options ...SuiteOption) (*Config, error) {
 	return cfg, nil
 }
 
-func NewConfigFromFile(path string, options ...SuiteOption) (*Config, error) {
+func NewConfigFromFile(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open config file: %v", err)

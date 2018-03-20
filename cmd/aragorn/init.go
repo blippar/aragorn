@@ -19,7 +19,6 @@ type initCommand struct{}
 
 func (*initCommand) Name() string { return "init" }
 func (*initCommand) Args() string {
-
 	return fmt.Sprintf("(%s) (default: HTTP)", availableTestSuites(" | "))
 }
 func (*initCommand) ShortHelp() string { return initHelp }
