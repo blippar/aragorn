@@ -1,4 +1,6 @@
-# Aragorn
+# Aragorn [![GitHub release](https://img.shields.io/github/release/blippar/aragorn.svg)](https://github.com/blippar/aragorn/releases/latest)
+
+![Aragorn logo](logo.png)
 
 ## Description
 
