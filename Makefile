@@ -50,10 +50,30 @@ docker:
 	$(info >>> Building docker image $(DOCKIMG) using $(DOCKBIN))
 	$(DOCKBIN) build $(DOCKOPTS) -t $(DOCKIMG):$(VERSION) -t $(DOCKIMG):latest .
 
+check: ## Lint the source code
+	@echo "==> Linting source code..."
+	@gometalinter \
+		--deadline 10m \
+		--vendor \
+		--sort="path" \
+		--aggregate \
+		--enable-gc \
+		--disable-all \
+		--enable goimports \
+		--enable misspell \
+		--enable vet \
+		--enable deadcode \
+		--enable varcheck \
+		--enable ineffassign \
+		--enable structcheck \
+		--enable unconvert \
+		--enable gofmt \
+		./...
+
 # Clean
 clean:
 	$(info >>> Cleaning up binaries and distribuables)
 	rm -rv $(TARGET)
 
 # Always execute these targets
-.PHONY: all $(TARGET) test static docker clean
+.PHONY: all $(TARGET) test static docker check clean

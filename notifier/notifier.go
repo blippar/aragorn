@@ -63,6 +63,10 @@ func (tr *TestReport) Errorf(format string, args ...interface{}) {
 	tr.Errs = append(tr.Errs, fmt.Errorf(format, args...))
 }
 
+func (tr *TestReport) Reset() {
+	tr.Errs = nil
+}
+
 func (tr *TestReport) Done() {
 	tr.Duration = time.Since(tr.Start)
 }

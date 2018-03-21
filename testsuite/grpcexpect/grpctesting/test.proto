@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package grpcexpect.testing;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "grpctesting";
+
+service TestService {
+    rpc EmptyCall(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc SimpleCall(SimpleRequest) returns (SimpleResponse) {}
+}
+
+message SimpleRequest {
+    string username = 1;
+}
+
+message SimpleResponse {
+    string message = 1;
+}

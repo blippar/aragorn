@@ -2,7 +2,7 @@ package httpexpect
 
 import (
 	"bytes"
-	"encoding/json"
+	gojson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/testsuite"
 )
 
@@ -36,7 +37,7 @@ type response struct {
 // checkResponse checks a response on which you can have expectations.
 // Any failed expectation will be logged on the logger.
 func checkResponse(test *test, logger testsuite.Logger, resp *http.Response, body []byte) {
-	if resp.StatusCode != test.statusCode {
+	if resp.StatusCode != test.statusCode && test.statusCode >= 0 {
 		str := string(body)
 		if len(str) > maxErrorBodySize {
 			str = fmt.Sprintf("%s... (%d)", str[:maxErrorBodySize], len(str))
@@ -136,7 +137,7 @@ func (r *response) unmarshalJSONBody() bool {
 	if r.dataJSONError {
 		return false
 	}
-	if err := decodeJSON(r.body, &r.dataJSON); err != nil {
+	if err := json.Unmarshal(r.body, &r.dataJSON); err != nil {
 		r.logger.Errorf("could not decode json response body: %v", err)
 		r.dataJSONError = true
 		return false
@@ -163,7 +164,7 @@ func lookupJSONData(k string, i interface{}) (interface{}, error) {
 	switch v := i.(type) {
 	case []interface{}:
 		if k == "length" {
-			return json.Number(strconv.Itoa(len(v))), nil
+			return gojson.Number(strconv.Itoa(len(v))), nil
 		}
 		i, err := strconv.Atoi(k)
 		if err != nil {

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -15,8 +17,8 @@ import (
 const runHelp = `Schedule the test suites in the configuration file`
 
 type runCommand struct {
-	config   string
-	failfast bool
+	config          string
+	shutdownTimeout time.Duration
 }
 
 func (*runCommand) Name() string { return "run" }
@@ -29,19 +31,35 @@ func (*runCommand) Hidden() bool      { return false }
 
 func (cmd *runCommand) Register(fs *flag.FlagSet) {
 	fs.StringVar(&cmd.config, "config", "config.json", "Path to your config file")
-	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
+	fs.DurationVar(&cmd.shutdownTimeout, "shutdown-timeout", 10*time.Second, "grace period for which to wait before shutting down")
 }
 
 func (cmd *runCommand) Run(args []string) error {
-	srv, err := server.New(cmd.config, cmd.failfast)
+	cfg, err := server.NewConfigFromFile(cmd.config)
 	if err != nil {
 		return err
+	}
+	suites, err := cfg.GenSuites()
+	if err != nil {
+		return err
+	}
+	srv := server.New(cfg.GenNotifier())
+	for _, suite := range suites {
+		if err := srv.AddSuite(suite); err != nil {
+			return err
+		}
 	}
 	if err := srv.Start(); err != nil {
 		return err
 	}
 	handleSignals()
-	srv.Stop()
+	ctx := context.Background()
+	if cmd.shutdownTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cmd.shutdownTimeout)
+		defer cancel()
+	}
+	srv.Stop(ctx)
 	return nil
 }
 

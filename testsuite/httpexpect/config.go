@@ -1,11 +1,8 @@
 package httpexpect
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -16,56 +13,76 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/oauth2/clientcredentials"
 
+	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/testsuite"
 )
 
 type Config struct {
-	Path  string
-	Base  Base
-	Tests []*Test
+	Path  string  `json:"path,omitempty"`
+	Root  string  `json:"root,omitempty"`
+	Base  Base    `json:"base,omitempty"`
+	Tests []*Test `json:"tests,omitempty"`
 }
 
 type Base struct {
-	URL      string // Base URL prepended to all requests' path.
-	Header   Header // Base set of headers added to all requests.
-	OAUTH2   clientcredentials.Config
-	Insecure bool
+	URL      string                    `json:"url,omitempty"`    // Base URL prepended to all requests' path.
+	Header   testsuite.Header          `json:"header,omitempty"` // Base set of headers added to all requests.
+	OAUTH2   *clientcredentials.Config `json:"oauth2,omitempty"`
+	Insecure bool                      `json:"insecure,omitempty"`
 }
 
 type Test struct {
-	Name    string  // Name used to identify this test.
-	Request Request // Request describes the HTTP request.
-	Expect  Expect  // Expect describes the expected result of the HTTP request.
+	Name    string  `json:"name,omitempty"`    // Name used to identify this test.
+	Request Request `json:"request,omitempty"` // Request describes the HTTP request.
+	Expect  Expect  `json:"expect,omitempty"`  // Expect describes the expected result of the HTTP request.
 }
 
 type Request struct {
-	URL     string // If set, will overwrite the base URL.
-	Path    string
-	Method  string
-	Header  Header
-	Timeout int
+	URL    string           `json:"url,omitempty"` // If set, will overwrite the base URL.
+	Path   string           `json:"path,omitempty"`
+	Method string           `json:"method,omitempty"`
+	Header testsuite.Header `json:"header,omitempty"`
 
 	// Only one of the three following must be set.
-	Body      interface{}
-	Multipart map[string]string
-	FormData  map[string]string
+	Body      interface{}       `json:"body,omitempty"`
+	Multipart map[string]string `json:"multipart,omitempty"`
+	FormData  map[string]string `json:"formData,omitempty"`
 }
 
 type Expect struct {
-	StatusCode int
-	Header     Header
+	StatusCode int              `json:"statusCode,omitempty"`
+	Header     testsuite.Header `json:"header,omitempty"`
 
-	Document   interface{}            // Exact document to match. Exclusive with JSONSchema.
-	JSONSchema map[string]interface{} // Exact JSON schema to match. Exclusive with Document.
-	JSONValues map[string]interface{} // Required JSON values. Optional, if JSONSchema is set.
+	Document   interface{}            `json:"document,omitempty"`   // Exact document to match. Exclusive with JSONSchema.
+	JSONSchema map[string]interface{} `json:"jsonSchema,omitempty"` // Exact JSON schema to match. Exclusive with Document.
+	JSONValues map[string]interface{} `json:"jsonValues,omitempty"` // Required JSON values. Optional, if JSONSchema is set.
 }
 
-// A Header represents the key-value pairs in an HTTP header.
-type Header map[string]string
-
-func (h Header) addToRequest(req *http.Request) {
-	for k, v := range h {
-		req.Header.Set(k, v)
+func (*Config) Example() interface{} {
+	return &Config{
+		Base: Base{
+			URL: "localhost:8000",
+		},
+		Tests: []*Test{
+			{
+				Name: "Index",
+				Request: Request{
+					Path: "/",
+					FormData: map[string]string{
+						"name": "John Doe",
+					},
+				},
+				Expect: Expect{
+					StatusCode: http.StatusNotFound,
+					Header: testsuite.Header{
+						"X-Custom-Header": "1",
+					},
+					Document: map[string]interface{}{
+						"message": "User not found!",
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -101,11 +118,9 @@ func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 		name:       t.Name,
 		client:     client,
 		statusCode: t.Expect.StatusCode,
-		header:     make(Header),
+		header:     testsuite.MergeHeaders(t.Expect.Header),
 	}
 	var errs []string
-
-	copyHeader(test.header, t.Expect.Header)
 
 	set := 0
 	if t.Request.Body != nil {
@@ -212,7 +227,7 @@ func (cfg *Config) getDocumentField(v interface{}) (interface{}, error) {
 		return ioutil.ReadAll(f)
 	}
 	var newVal interface{}
-	err = decodeReaderJSON(f, &newVal)
+	err = json.Decode(f, &newVal)
 	return newVal, err
 }
 
@@ -228,7 +243,7 @@ func (cfg *Config) getObjectField(m map[string]interface{}) (map[string]interfac
 	}
 	defer f.Close()
 	var newVal map[string]interface{}
-	err = decodeReaderJSON(f, &newVal)
+	err = json.Decode(f, &newVal)
 	return newVal, err
 }
 
@@ -236,13 +251,7 @@ func (cfg *Config) getFilePath(path string) string {
 	if filepath.IsAbs(path) {
 		return path
 	}
-	return filepath.Join(cfg.Path, path)
-}
-
-func copyHeader(dest, src Header) {
-	for k, v := range src {
-		dest[k] = v
-	}
+	return filepath.Join(cfg.Root, path)
 }
 
 func concatErrors(errs []string) error {
@@ -250,14 +259,4 @@ func concatErrors(errs []string) error {
 		return errors.New(strings.Join(errs, "\n"))
 	}
 	return nil
-}
-
-func decodeReaderJSON(r io.Reader, v interface{}) error {
-	decoder := json.NewDecoder(r)
-	decoder.UseNumber()
-	return decoder.Decode(v)
-}
-
-func decodeJSON(b []byte, v interface{}) error {
-	return decodeReaderJSON(bytes.NewReader(b), v)
 }

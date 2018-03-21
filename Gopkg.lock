@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "cloud.google.com/go"
+  packages = ["compute/metadata"]
+  revision = "20d4028b8a750c2aca76bf9fefa8ed2d0109b573"
+  version = "v0.19.0"
+
+[[projects]]
   name = "github.com/apache/thrift"
   packages = ["lib/go/thrift"]
   revision = "b2a4d4ae21c789b689dd162deb819665567f481c"
@@ -20,6 +26,12 @@
   version = "v1.4.7"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/fullstorydev/grpcurl"
+  packages = ["."]
+  revision = "ceba64b97144d6a92a0830a3c9cacf4e1a617a48"
+
+[[projects]]
   name = "github.com/gogo/protobuf"
   packages = ["proto"]
   revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
@@ -27,7 +39,18 @@
 
 [[projects]]
   name = "github.com/golang/protobuf"
-  packages = ["proto"]
+  packages = [
+    "jsonpb",
+    "proto",
+    "protoc-gen-go/descriptor",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/empty",
+    "ptypes/struct",
+    "ptypes/timestamp",
+    "ptypes/wrappers"
+  ]
   revision = "925541529c1fa6821df4e44ce2723319eb2be768"
   version = "v1.0.0"
 
@@ -47,6 +70,30 @@
   packages = ["."]
   revision = "a557574d6c024ed6e36acc8b610f5f211c91568a"
   version = "1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/grpc-ecosystem/go-grpc-middleware"
+  packages = [
+    ".",
+    "tags",
+    "tracing/opentracing",
+    "util/metautils"
+  ]
+  revision = "eb23b08d08bbe930113a6512a7a829050341448c"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/jhump/protoreflect"
+  packages = [
+    "desc",
+    "desc/internal",
+    "dynamic",
+    "dynamic/grpcdynamic",
+    "grpcreflect",
+    "internal"
+  ]
+  revision = "19350c281a732a9a9ee6b32714904be72f85a6c9"
 
 [[projects]]
   branch = "master"
@@ -155,7 +202,11 @@
   packages = [
     "context",
     "context/ctxhttp",
+    "http2",
+    "http2/hpack",
+    "idna",
     "internal/timeseries",
+    "lex/httplex",
     "trace"
   ]
   revision = "f5dfe339be1d06f81b22525fe34671ee7d2c8904"
@@ -166,7 +217,10 @@
   packages = [
     ".",
     "clientcredentials",
-    "internal"
+    "google",
+    "internal",
+    "jws",
+    "jwt"
   ]
   revision = "543e37812f10c46c622c9575afd7ad22f22a12ba"
 
@@ -177,12 +231,36 @@
   revision = "37707fdb30a5b38865cfb95e5aab41707daec7fd"
 
 [[projects]]
+  name = "golang.org/x/text"
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable"
+  ]
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
+
+[[projects]]
   name = "google.golang.org/appengine"
   packages = [
+    ".",
     "internal",
+    "internal/app_identity",
     "internal/base",
     "internal/datastore",
     "internal/log",
+    "internal/modules",
     "internal/remote_api",
     "internal/urlfetch",
     "urlfetch"
@@ -190,9 +268,48 @@
   revision = "150dc57a1b433e64154302bdc40b6bb8aefa313a"
   version = "v1.0.0"
 
+[[projects]]
+  branch = "master"
+  name = "google.golang.org/genproto"
+  packages = ["googleapis/rpc/status"]
+  revision = "2c5e7ac708aaa719366570dd82bda44541ca2a63"
+
+[[projects]]
+  name = "google.golang.org/grpc"
+  packages = [
+    ".",
+    "balancer",
+    "balancer/base",
+    "balancer/roundrobin",
+    "codes",
+    "connectivity",
+    "credentials",
+    "credentials/oauth",
+    "encoding",
+    "encoding/proto",
+    "grpclb/grpc_lb_v1/messages",
+    "grpclog",
+    "internal",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "reflection",
+    "reflection/grpc_reflection_v1alpha",
+    "resolver",
+    "resolver/dns",
+    "resolver/passthrough",
+    "stats",
+    "status",
+    "tap",
+    "transport"
+  ]
+  revision = "8e4536a86ab602859c20df5ebfd0bd4228d08655"
+  version = "v1.10.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "21dfa148394efe5a9165699175cf512061e7887a1bcc1898168cac15a1ee3e22"
+  inputs-digest = "1de157c34ebb298bd87dafa6117e25048003e1f17042607caee534a1a24e58ff"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -33,7 +33,7 @@ func New(cfg *Config) (*Suite, error) {
 		}
 	}
 	client.Transport = &nethttp.Transport{RoundTripper: client.Transport}
-	if cfg.Base.OAUTH2.ClientID != "" && cfg.Base.OAUTH2.ClientSecret != "" {
+	if cfg.Base.OAUTH2 != nil {
 		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
 		client = cfg.Base.OAUTH2.Client(ctx)
 	}
@@ -54,7 +54,7 @@ type test struct {
 	req    *http.Request // Raw HTTP request generated from the request description.
 
 	statusCode int
-	header     Header
+	header     testsuite.Header
 
 	document   interface{}
 	jsonSchema *gojsonschema.Schema   // Compiled jsonschema.
@@ -110,7 +110,8 @@ func init() {
 		Config: (*Config)(nil),
 		InitFn: func(ctx *plugin.InitContext) (interface{}, error) {
 			cfg := ctx.Config.(*Config)
-			cfg.Path = ctx.Root
+			cfg.Path = ctx.Path
+			cfg.Root = ctx.Root
 			return New(cfg)
 		},
 	})

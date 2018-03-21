@@ -12,16 +12,19 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/blippar/aragorn/testsuite"
 )
 
 var cfgTest = &Config{
+	Path: "./testdata/test.suite.json",
+	Root: "./testdata/",
 	Base: Base{
 		URL: "http://localhost:3000",
-		Header: Header{
+		Header: testsuite.Header{
 			"X-Custom-Test": "test",
 		},
 	},
-	Path: "./testdata",
 }
 
 var (
@@ -313,7 +316,8 @@ func TestSuiteRunTestJSON(t *testing.T) {
 	}))
 	defer ts.Close()
 	cfg := &Config{
-		Path: "./testdata/",
+		Path: "./testdata/test.suite.json",
+		Root: "./testdata/",
 		Base: Base{
 			URL: ts.URL,
 		},
@@ -326,7 +330,7 @@ func TestSuiteRunTestJSON(t *testing.T) {
 				Expect: Expect{
 					StatusCode: http.StatusOK,
 					Document:   userRef,
-					Header: Header{
+					Header: testsuite.Header{
 						"X-Custom-Header": "1",
 					},
 				},

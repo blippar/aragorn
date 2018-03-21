@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -13,6 +14,8 @@ var (
 	ErrInvalidCronExpr = errors.New("invalid cron expression")
 	ErrJobAlreadyExist = errors.New("job already exist")
 	ErrJobNotFound     = errors.New("job not found")
+	ErrAlreadyStarted  = errors.New("already started")
+	ErrNotRunning      = errors.New("not running")
 )
 
 // Scheduler schedules jobs to run them at a given interval.
@@ -31,19 +34,30 @@ func New() *Scheduler {
 }
 
 // Start starts the scheduler.
-func (s *Scheduler) Start() {
-	s.running = true
+func (s *Scheduler) Start() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.running {
+		return ErrAlreadyStarted
+	}
 	for _, j := range s.jobs {
 		j.schedule()
 	}
+	s.running = true
+	return nil
 }
 
 // Stop stops the scheduler.
-func (s *Scheduler) Stop() {
+func (s *Scheduler) Stop(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.running {
+		return ErrNotRunning
+	}
 	for _, j := range s.jobs {
 		j.cancel()
 	}
-	s.running = false
+	return nil
 }
 
 // Add adds a job in the scheduler. The job runs every interval duration
