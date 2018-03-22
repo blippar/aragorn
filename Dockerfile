@@ -1,3 +1,6 @@
+##
+## Build phase
+##
 FROM golang:alpine AS builder
 
 RUN apk add --no-cache make
@@ -10,6 +13,9 @@ WORKDIR /go/src/github.com/blippar/aragorn
 
 RUN make VERSION="${VERSION}" COMMIT_HASH="${COMMIT_HASH}" static
 
+##
+## Runtime image
+##
 FROM alpine:latest AS runtime
 
 RUN apk add --no-cache ca-certificates
