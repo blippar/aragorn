@@ -4,8 +4,8 @@
 [[projects]]
   name = "cloud.google.com/go"
   packages = ["compute/metadata"]
-  revision = "20d4028b8a750c2aca76bf9fefa8ed2d0109b573"
-  version = "v0.19.0"
+  revision = "4b98a6370e36d7a85192e7bad08a4ebd82eac2a8"
+  version = "v0.20.0"
 
 [[projects]]
   name = "github.com/apache/thrift"
@@ -29,7 +29,7 @@
   branch = "master"
   name = "github.com/fullstorydev/grpcurl"
   packages = ["."]
-  revision = "ceba64b97144d6a92a0830a3c9cacf4e1a617a48"
+  revision = "585cd1bae8b5c577fa9639d7053b741c5566d408"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
@@ -62,8 +62,8 @@
     "cmp/internal/function",
     "cmp/internal/value"
   ]
-  revision = "8099a9787ce5dc5984ed879a3bda47dc730a8e97"
-  version = "v0.1.0"
+  revision = "3af367b6b30c263d47e8895973edcca9a49cf029"
+  version = "v0.2.0"
 
 [[projects]]
   name = "github.com/gorhill/cronexpr"
@@ -93,13 +93,13 @@
     "grpcreflect",
     "internal"
   ]
-  revision = "19350c281a732a9a9ee6b32714904be72f85a6c9"
+  revision = "6f4f3bba11fd817df7f57c9b319eeb55a2590167"
 
 [[projects]]
   branch = "master"
   name = "github.com/opentracing-contrib/go-stdlib"
   packages = ["nethttp"]
-  revision = "b1a47cfbdd7543e70e9ef3e73d0802ad306cc1cc"
+  revision = "36723135187404d2f4002f4f189938565e64cc5c"
 
 [[projects]]
   name = "github.com/opentracing/basictracer-go"
@@ -129,6 +129,7 @@
     "internal/baggage",
     "internal/baggage/remote",
     "internal/spanlog",
+    "internal/throttler",
     "log",
     "rpcmetrics",
     "thrift-gen/agent",
@@ -138,14 +139,14 @@
     "thrift-gen/zipkincore",
     "utils"
   ]
-  revision = "3ac96c6e679cb60a74589b0d0aa7c70a906183f7"
-  version = "v2.11.2"
+  revision = "c107110d057826281414cb964f167bce5be17588"
+  version = "v2.12.0"
 
 [[projects]]
   name = "github.com/uber/jaeger-lib"
   packages = ["metrics"]
-  revision = "7f95f4f7e80028096410abddaae2556e4c61b59f"
-  version = "v1.3.1"
+  revision = "4267858c0679cd4e47cefed8d7f70fd386cfb567"
+  version = "v1.4.0"
 
 [[projects]]
   branch = "master"
@@ -194,7 +195,7 @@
   branch = "master"
   name = "go4.org"
   packages = ["errorutil"]
-  revision = "fba789b7e39ba524b9e60c45c37a50fae63a2a09"
+  revision = "e6a7f04a962e05f288f348eec6de20fe93b6b292"
 
 [[projects]]
   branch = "master"
@@ -209,7 +210,7 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "f5dfe339be1d06f81b22525fe34671ee7d2c8904"
+  revision = "6078986fec03a1dcc236c34816c71b0e05018fda"
 
 [[projects]]
   branch = "master"
@@ -222,13 +223,13 @@
     "jws",
     "jwt"
   ]
-  revision = "543e37812f10c46c622c9575afd7ad22f22a12ba"
+  revision = "fdc9e635145ae97e6c2cb777c48305600cf515cb"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "37707fdb30a5b38865cfb95e5aab41707daec7fd"
+  revision = "91ee8cde435411ca3f1cd365e8f20131aed4d0a1"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -272,7 +273,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "2c5e7ac708aaa719366570dd82bda44541ca2a63"
+  revision = "f8c8703595236ae70fdf8789ecb656ea0bcdcf46"
 
 [[projects]]
   name = "google.golang.org/grpc"
