@@ -170,7 +170,7 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 #### HTTP URL Templating
 
-The URL path and query can be constructed from previous tests throught templating.
+The URL path and query can be constructed from previous tests through templating.
 
 ```json
 {
