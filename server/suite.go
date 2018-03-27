@@ -138,6 +138,7 @@ func (s *Suite) Run(ctx context.Context) *notifier.Report {
 func (s *Suite) runTests(ctx context.Context, span ot.Span) *notifier.Report {
 	report := notifier.NewReport(s)
 	defer report.Done()
+	ctx = testsuite.NewMDContext(ctx, testsuite.NewMD())
 	for _, t := range s.tests {
 		ok := s.runTestWithRetry(ctx, t, report)
 		if !ok {

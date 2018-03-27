@@ -22,15 +22,15 @@ func (l *jsonGoLoader) JsonReference() (gojsonreference.JsonReference, error) {
 }
 
 func (l *jsonGoLoader) LoaderFactory() gojsonschema.JSONLoaderFactory {
-	return JSONLoaderFactory{}
+	return jsonLoaderFactory{}
 }
 
 func (l *jsonGoLoader) LoadJSON() (interface{}, error) {
 	return l.doc, nil
 }
 
-type JSONLoaderFactory struct{}
+type jsonLoaderFactory struct{}
 
-func (JSONLoaderFactory) New(source string) gojsonschema.JSONLoader {
+func (jsonLoaderFactory) New(source string) gojsonschema.JSONLoader {
 	return gojsonschema.NewReferenceLoader(source)
 }

@@ -19,9 +19,9 @@ const maxErrorBodySize = 512
 
 var (
 	errInvalidArrayIndex   = errors.New("invalid array index")
+	errInvalidType         = errors.New("invalid type")
 	errIndexOutOfBounds    = errors.New("array index out of bounds")
 	errObjectFieldNotFound = errors.New("object does not contain field")
-	errInvalidType         = errors.New("invalid type")
 )
 
 // response wraps an http.Response and allows you to have expectations on it.
@@ -36,7 +36,7 @@ type response struct {
 
 // checkResponse checks a response on which you can have expectations.
 // Any failed expectation will be logged on the logger.
-func checkResponse(test *test, logger testsuite.Logger, resp *http.Response, body []byte) {
+func checkResponse(test *test, logger testsuite.Logger, md testsuite.MD, resp *http.Response, body []byte) {
 	if resp.StatusCode != test.statusCode && test.statusCode >= 0 {
 		str := string(body)
 		if len(str) > maxErrorBodySize {
@@ -60,6 +60,12 @@ func checkResponse(test *test, logger testsuite.Logger, resp *http.Response, bod
 	}
 	if test.jsonValues != nil {
 		r.containsJSONValues()
+	}
+	if test.saveDoc && md != nil {
+		if !r.unmarshalJSONBody() {
+			return
+		}
+		md[test.id] = r.dataJSON
 	}
 }
 
