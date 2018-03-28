@@ -3,8 +3,11 @@ package httpexpect
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/opentracing-contrib/go-stdlib/nethttp"
 	ot "github.com/opentracing/opentracing-go"
@@ -47,11 +50,16 @@ func New(cfg *Config) (*Suite, error) {
 func (s *Suite) Tests() []testsuite.Test { return s.tests }
 
 type test struct {
+	id          string
 	name        string
 	description string
+	saveDoc     bool
 
 	client *http.Client
 	req    *http.Request // Raw HTTP request generated from the request description.
+
+	urlPathQueries  []string
+	urlQueryQueries []string
 
 	statusCode int
 	header     testsuite.Header
@@ -67,6 +75,32 @@ func (t *test) Description() string { return t.description }
 func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 	req := t.cloneRequest().WithContext(ctx)
 
+	md, ok := testsuite.MDFromContext(ctx)
+	if ok {
+		if len(t.urlPathQueries) > 0 {
+			oldnew := make([]string, 0, len(t.urlPathQueries)*2)
+			for _, q := range t.urlPathQueries {
+				v, err := queryJSONData(q[2:len(q)-2], map[string]interface{}(md))
+				if err != nil {
+					continue
+				}
+				oldnew = append(oldnew, q, fmt.Sprint(v))
+			}
+			req.URL.Path = strings.NewReplacer(oldnew...).Replace(req.URL.Path)
+			req.URL.RawPath = ""
+		}
+		if len(t.urlQueryQueries) > 0 {
+			oldnew := make([]string, 0, len(t.urlQueryQueries)*2)
+			for _, q := range t.urlQueryQueries {
+				v, err := queryJSONData(q[2:len(q)-2], map[string]interface{}(md))
+				if err != nil {
+					continue
+				}
+				oldnew = append(oldnew, q, url.QueryEscape(fmt.Sprint(v)))
+			}
+			req.URL.RawQuery = strings.NewReplacer(oldnew...).Replace(req.URL.RawQuery)
+		}
+	}
 	opName := "HTTP: " + t.Name()
 	req, ht := nethttp.TraceRequest(ot.GlobalTracer(), req, nethttp.OperationName(opName))
 	defer ht.Finish()
@@ -82,7 +116,7 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 		l.Errorf("could not read body: %v", err)
 		return
 	}
-	checkResponse(t, l, resp, body)
+	checkResponse(t, l, md, resp, body)
 }
 
 // cloneRequest returns a clone of the provided *http.Request.

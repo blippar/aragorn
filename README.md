@@ -137,11 +137,13 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 
 #### HTTPTest
 
-| Name    | Type          | Description                                                          |
-| ------- | ------------- | -------------------------------------------------------------------- |
-| name    | `string`      | **REQUIRED**. Name used to uniquely identify this test in the suite. |
-| request | `HTTPRequest` | Description of the HTTP request to perform.                          |
-| expect  | `HTTPExpect`  | Expected result of the HTTP request.                                 |
+| Name         | Type          | Description                                                          |
+| ------------ | ------------- | -------------------------------------------------------------------- |
+| id           | `string`      | Identifier use for stateful url templating tests.                    |
+| name         | `string`      | **REQUIRED**. Name used to uniquely identify this test in the suite. |
+| request      | `HTTPRequest` | Description of the HTTP request to perform.                          |
+| expect       | `HTTPExpect`  | Expected result of the HTTP request.                                 |
+| saveDocument | `bool`        | Save the response document for other tests.                          |
 
 #### HTTPRequest
 
@@ -165,6 +167,33 @@ See golang.org/x/oauth2/clientcredentials Config [documentation](https://godoc.o
 | jsonValues | `HTTPObject`        | Expected Specific JSON values to be returned.                            |
 
 1.  See [json-schema.org](http://json-schema.org/) and [Understanding JSON Schema](https://spacetelescope.github.io/understanding-json-schema/index.html) for more info.
+
+#### HTTP URL Templating
+
+The URL path and query can be constructed from previous tests through templating.
+
+```json
+{
+  "tests": [
+    {
+      "id": "add_todo",
+      "name": "Add Todo",
+      "request": {
+        "method": "POST",
+        "path": "/todo"
+      },
+      "saveDocument": true
+    },
+    {
+      "name": "Get Todo",
+      "request": {
+        "method": "GET",
+        "path": "/todo/{{add_todo.id}}"
+      }
+    }
+  ]
+}
+```
 
 #### HTTPDocument
 
