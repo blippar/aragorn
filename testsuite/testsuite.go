@@ -41,3 +41,20 @@ func (h Header) Slice() []string {
 	}
 	return res
 }
+
+type MD map[string]interface{}
+
+type mdKey struct{}
+
+func NewMD() MD {
+	return MD{}
+}
+
+func NewMDContext(ctx context.Context, md MD) context.Context {
+	return context.WithValue(ctx, mdKey{}, md)
+}
+
+func MDFromContext(ctx context.Context) (md MD, ok bool) {
+	md, ok = ctx.Value(mdKey{}).(MD)
+	return
+}

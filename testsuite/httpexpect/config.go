@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -16,6 +17,8 @@ import (
 	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/testsuite"
 )
+
+var varsTmpl = regexp.MustCompile(`{{[0-9A-Za-z._-]+}}`)
 
 type Config struct {
 	Path  string  `json:"path,omitempty"`
@@ -32,9 +35,11 @@ type Base struct {
 }
 
 type Test struct {
-	Name    string  `json:"name,omitempty"`    // Name used to identify this test.
-	Request Request `json:"request,omitempty"` // Request describes the HTTP request.
-	Expect  Expect  `json:"expect,omitempty"`  // Expect describes the expected result of the HTTP request.
+	ID           string  `json:"id,omitempty"`
+	Name         string  `json:"name,omitempty"`    // Name used to identify this test.
+	Request      Request `json:"request,omitempty"` // Request describes the HTTP request.
+	Expect       Expect  `json:"expect,omitempty"`  // Expect describes the expected result of the HTTP request.
+	SaveDocument bool    `json:"saveDocument,omitempty"`
 }
 
 type Request struct {
@@ -65,6 +70,7 @@ func (*Config) Example() interface{} {
 		},
 		Tests: []*Test{
 			{
+				ID:   "index",
 				Name: "Index",
 				Request: Request{
 					Path: "/",
@@ -115,10 +121,12 @@ func (cfg *Config) genTests(client *http.Client) ([]testsuite.Test, error) {
 
 func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 	test := &test{
+		id:         t.ID,
 		name:       t.Name,
 		client:     client,
 		statusCode: t.Expect.StatusCode,
 		header:     testsuite.MergeHeaders(t.Expect.Header),
+		saveDoc:    t.SaveDocument,
 	}
 	var errs []string
 
@@ -141,6 +149,8 @@ func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 	} else {
 		test.req = httpReq
 		test.description = httpReq.Method + " " + httpReq.URL.String()
+		test.urlPathQueries = varsTmpl.FindAllString(httpReq.URL.RawPath, -1)
+		test.urlQueryQueries = varsTmpl.FindAllString(httpReq.URL.RawQuery, -1)
 	}
 
 	if test.statusCode == 0 {
