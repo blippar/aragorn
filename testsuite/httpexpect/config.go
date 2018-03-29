@@ -178,14 +178,7 @@ func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 	}
 
 	if t.Expect.JSONSchema != nil {
-		if ref, ok := t.Expect.JSONSchema["$ref"].(string); ok {
-			if !strings.Contains(ref, "://") {
-				relRef := cfg.getFilePath(ref)
-				if absRef, err := filepath.Abs(relRef); err == nil {
-					t.Expect.JSONSchema["$ref"] = "file://" + absRef
-				}
-			}
-		}
+		cfg.fixRefInDoc(t.Expect.JSONSchema)
 		schemaLoader := newJSONGoLoader(t.Expect.JSONSchema)
 		if jsonSchema, err := gojsonschema.NewSchema(schemaLoader); err != nil {
 			errs = append(errs, fmt.Sprintf("- expect: could not load JSON schema: %v", err))
@@ -255,6 +248,34 @@ func (cfg *Config) getObjectField(m map[string]interface{}) (map[string]interfac
 	var newVal map[string]interface{}
 	err = json.Decode(f, &newVal)
 	return newVal, err
+}
+
+func (cfg *Config) fixRefInDoc(m map[string]interface{}) {
+	for k, v := range m {
+		if k == "$ref" {
+			if ref, ok := v.(string); ok {
+				if !strings.Contains(ref, "://") {
+					relRef := cfg.getFilePath(ref)
+					if absRef, err := filepath.Abs(relRef); err == nil {
+						m[k] = "file://" + absRef
+					}
+				}
+			}
+			continue
+		}
+		cfg.fixRefInInterface(v)
+	}
+}
+
+func (cfg *Config) fixRefInInterface(i interface{}) {
+	switch v := i.(type) {
+	case []interface{}:
+		for _, item := range v {
+			cfg.fixRefInInterface(item)
+		}
+	case map[string]interface{}:
+		cfg.fixRefInDoc(v)
+	}
 }
 
 func (cfg *Config) getFilePath(path string) string {
