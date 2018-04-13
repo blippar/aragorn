@@ -3,8 +3,10 @@
 package grpcexpect
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"testing"
 
@@ -14,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 
 	"github.com/blippar/aragorn/testsuite"
 	"github.com/blippar/aragorn/testsuite/grpcexpect/grpctesting"
@@ -155,6 +158,14 @@ func TestNewReflect(t *testing.T) {
 				},
 			},
 			{
+				Name: "Process File",
+				Request: RequestConfig{
+					Method:   "grpcexpect.testing.TestService.ProcessFile",
+					Document: map[string]interface{}{"$ref": "testdata/user.json"},
+				},
+				Expect: ExpectConfig{Code: codes.OK},
+			},
+			{
 				Name:    "Method not found",
 				Request: RequestConfig{Method: "invalid_service/invalid_method"},
 			},
@@ -170,6 +181,7 @@ func TestNewReflect(t *testing.T) {
 		{`could not invoke method: could not parse given request body as message of type "grpcexpect.testing.SimpleRequest": Message type grpcexpect.testing.SimpleRequest has no known field named invalid_field`},
 		{`could not unmarshal expected document: Message type grpcexpect.testing.SimpleResponse has no known field named test`},
 		{"wrong number of response (got 1; want 2)"},
+		nil,
 		{`could not invoke method: target server does not expose service "invalid_service"`},
 	}
 	checkSuite(t, cfg, testsErrs)
@@ -241,4 +253,16 @@ func (testServer) SimpleCall(ctx context.Context, in *grpctesting.SimpleRequest)
 	}, nil
 }
 
-var _ grpctesting.TestServiceServer = (*testServer)(nil)
+func (testServer) ProcessFile(ctx context.Context, in *grpctesting.ProcessFileRequest) (*grpctesting.ProcessFileResponse, error) {
+	if want := "John Doe"; string(in.Name) != want {
+		return nil, status.Errorf(codes.Internal, "invalid name: (got %q; want %q)", in.Name, want)
+	}
+	data, err := ioutil.ReadFile("./testdata/testtube.png")
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not read file: %v", err)
+	}
+	if !bytes.Equal(data, in.Data) {
+		return nil, status.Error(codes.Internal, "invalid data")
+	}
+	return &grpctesting.ProcessFileResponse{}, nil
+}
