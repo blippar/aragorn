@@ -179,9 +179,9 @@ func loadDoc(path string, i interface{}) (interface{}, error) {
 				refPath = filepath.Join(path, ref)
 			}
 			if raw, _ := doc["$raw"].(bool); raw {
-				return loadFileDoc(refPath)
+				return readFileToBase64String(refPath)
 			}
-			return loadJSONFileDoc(refPath)
+			return readJSONFileToDoc(refPath)
 		}
 		if raw, ok := doc["$raw"].(string); ok {
 			return base64.StdEncoding.EncodeToString([]byte(raw)), nil
@@ -197,7 +197,7 @@ func loadDoc(path string, i interface{}) (interface{}, error) {
 	return i, nil
 }
 
-func loadJSONFileDoc(path string) (interface{}, error) {
+func readJSONFileToDoc(path string) (interface{}, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -211,12 +211,7 @@ func loadJSONFileDoc(path string) (interface{}, error) {
 	return loadDoc(dir, newVal)
 }
 
-func loadFileDoc(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
+func readFileToBase64String(path string) (string, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", err
