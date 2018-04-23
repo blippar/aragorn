@@ -1,0 +1,4 @@
+{
+  "name": { "$raw": "John Doe" },
+  "data": { "$ref": "testtube.png", "$raw": true }
+}
