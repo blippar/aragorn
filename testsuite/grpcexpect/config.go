@@ -187,9 +187,12 @@ func loadDoc(path string, i interface{}) (interface{}, error) {
 			return base64.StdEncoding.EncodeToString([]byte(raw)), nil
 		}
 		for k, v := range doc {
-			if newVal, err := loadDoc(path, v); err != nil {
+			newVal, err := loadDoc(path, v)
+			if err != nil {
 				return nil, err
-			} else if newVal != v {
+			}
+			_, isMap := v.(map[string]interface{})
+			if isMap && newVal != v {
 				doc[k] = newVal
 			}
 		}

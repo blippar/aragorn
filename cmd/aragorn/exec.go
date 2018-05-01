@@ -36,7 +36,7 @@ func (cmd *execCommand) Register(fs *flag.FlagSet) {
 	fs.StringVar(&cmd.config, "config", "", "Path to your config file")
 	fs.BoolVar(&cmd.failfast, "failfast", false, "Stop after first test failure")
 	fs.StringVar(&cmd.filter, "filter", "", "Execute only the tests that match the regular expression")
-	fs.DurationVar(&cmd.timeout, "timeout", 30*time.Second, "Timeout specifies a time limit for each test")
+	fs.DurationVar(&cmd.timeout, "timeout", 0, "Timeout specifies a time limit for each test")
 	fs.BoolVar(&cmd.wait, "wait", false, "Wait")
 }
 
@@ -49,9 +49,11 @@ func (cmd *execCommand) Run(args []string) error {
 		suiteOpts = []server.SuiteOption{
 			server.FailFast(cmd.failfast),
 			server.Filter(cmd.filter),
-			server.Timeout(cmd.timeout),
 		}
 	)
+	if cmd.timeout > 0 {
+		suiteOpts = append(suiteOpts, server.Timeout(cmd.timeout))
+	}
 	if cmd.config != "" {
 		cfg, err := server.NewConfigFromFile(cmd.config)
 		if err != nil {
