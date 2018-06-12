@@ -1,6 +1,11 @@
-# Aragorn [![GitHub release](https://img.shields.io/github/release/blippar/aragorn.svg)](https://github.com/blippar/aragorn/releases/latest)
+Aragorn
+===
 
-![Aragorn logo](logo.png)
+[![Go Report Card](https://goreportcard.com/badge/github.com/blippar/aragorn)](https://goreportcard.com/report/github.com/blippar/aragorn)
+[![GoDoc](https://godoc.org/github.com/blippar/aragorn?status.svg)](https://godoc.org/github.com/blippar/aragorn)
+[![GitHub release](https://img.shields.io/github/release/blippar/aragorn.svg)](https://github.com/blippar/aragorn/releases/latest)
+
+[![Aragorn logo, by Malenea](logo.png)](https://github.com/Malenea)
 
 ## Description
 
