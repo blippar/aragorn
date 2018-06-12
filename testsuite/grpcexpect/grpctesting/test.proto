@@ -7,14 +7,22 @@ import "google/protobuf/empty.proto";
 option go_package = "grpctesting";
 
 service TestService {
-    rpc EmptyCall(google.protobuf.Empty) returns (google.protobuf.Empty) {}
-    rpc SimpleCall(SimpleRequest) returns (SimpleResponse) {}
+  rpc EmptyCall(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+  rpc SimpleCall(SimpleRequest) returns (SimpleResponse) {}
+  rpc ProcessFile(ProcessFileRequest) returns (ProcessFileResponse) {}
 }
 
 message SimpleRequest {
-    string username = 1;
+  string username = 1;
 }
 
 message SimpleResponse {
-    string message = 1;
+  string message = 1;
 }
+
+message ProcessFileRequest {
+  bytes name = 1;
+  bytes data = 2;
+}
+
+message ProcessFileResponse {}

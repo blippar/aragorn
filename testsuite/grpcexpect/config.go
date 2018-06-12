@@ -3,6 +3,7 @@ package grpcexpect
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -76,11 +77,11 @@ func (*Config) Example() interface{} {
 func (cfg *Config) genTests(cc *grpc.ClientConn, descSource grpcurl.DescriptorSource) ([]testsuite.Test, error) {
 	tests := make([]testsuite.Test, len(cfg.Tests))
 	for i, tcfg := range cfg.Tests {
-		reqMsgs, err := newDocToMsgs(tcfg.Request.Document)
+		reqMsgs, err := cfg.newDocToMsgs(tcfg.Request.Document)
 		if err != nil {
 			return nil, fmt.Errorf("test %d %s: request: %v", i, tcfg.Name, err)
 		}
-		expMsgs, err := newDocToMsgs(tcfg.Expect.Document)
+		expMsgs, err := cfg.newDocToMsgs(tcfg.Expect.Document)
 		if err != nil {
 			return nil, fmt.Errorf("test %d %s: expect: %v", i, tcfg.Name, err)
 		}
@@ -102,26 +103,6 @@ func (cfg *Config) genTests(cc *grpc.ClientConn, descSource grpcurl.DescriptorSo
 		}
 	}
 	return tests, nil
-}
-
-func (cfg *Config) getDocumentField(v interface{}) (interface{}, error) {
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return v, nil
-	}
-	ref, ok := m["$ref"].(string)
-	if !ok {
-		return v, nil
-	}
-	path := cfg.getFilePath(ref)
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var newVal interface{}
-	err = json.Decode(f, &newVal)
-	return newVal, err
 }
 
 func (cfg *Config) getFilePath(path string) string {
@@ -155,9 +136,13 @@ func (cfg *Config) transportDialOption() (grpc.DialOption, error) {
 	return grpc.WithTransportCredentials(tc), nil
 }
 
-func newDocToMsgs(doc interface{}) ([][]byte, error) {
+func (cfg *Config) newDocToMsgs(doc interface{}) ([][]byte, error) {
+	d, err := loadDoc(cfg.Path, doc)
+	if err != nil {
+		return nil, err
+	}
 	var a []interface{}
-	switch v := doc.(type) {
+	switch v := d.(type) {
 	case []interface{}:
 		a = v
 	case map[string]interface{}:
@@ -172,4 +157,67 @@ func newDocToMsgs(doc interface{}) ([][]byte, error) {
 		res[i], _ = json.Marshal(v)
 	}
 	return res, nil
+}
+
+func loadDoc(path string, i interface{}) (interface{}, error) {
+	switch doc := i.(type) {
+	case []interface{}:
+		for i, item := range doc {
+			newVal, err := loadDoc(path, item)
+			if err != nil {
+				return nil, err
+			} else if &newVal != &item {
+				doc[i] = newVal
+			}
+		}
+	case map[string]interface{}:
+		if ref, ok := doc["$ref"].(string); ok {
+			var refPath string
+			if filepath.IsAbs(ref) {
+				refPath = ref
+			} else {
+				refPath = filepath.Join(path, ref)
+			}
+			if raw, _ := doc["$raw"].(bool); raw {
+				return readFileToBase64String(refPath)
+			}
+			return readJSONFileToDoc(refPath)
+		}
+		if raw, ok := doc["$raw"].(string); ok {
+			return base64.StdEncoding.EncodeToString([]byte(raw)), nil
+		}
+		for k, v := range doc {
+			newVal, err := loadDoc(path, v)
+			if err != nil {
+				return nil, err
+			}
+			_, isMap := v.(map[string]interface{})
+			if isMap && newVal != v {
+				doc[k] = newVal
+			}
+		}
+	}
+	return i, nil
+}
+
+func readJSONFileToDoc(path string) (interface{}, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var newVal map[string]interface{}
+	if err := json.Decode(f, &newVal); err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(path)
+	return loadDoc(dir, newVal)
+}
+
+func readFileToBase64String(path string) (string, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(data), nil
 }

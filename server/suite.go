@@ -159,7 +159,6 @@ func (s *Suite) runTests(ctx context.Context, span ot.Span) *notifier.Report {
 // in between each try.
 func (s *Suite) runTestWithRetry(ctx context.Context, t testsuite.Test, r *notifier.Report) bool {
 	tr := r.NewTestReport(t)
-	defer tr.Done()
 	for attempt := 1; ; attempt++ {
 		if ok := s.runTest(ctx, t, tr); ok {
 			return ok
@@ -187,7 +186,7 @@ func (s *Suite) runTest(ctx context.Context, t testsuite.Test, tr *notifier.Test
 	defer cancel()
 
 	t.Run(ctx, tr)
-
+	tr.Done()
 	fields := []zapcore.Field{
 		zap.String("name", t.Name()),
 		zap.Time("started_at", tr.Start),
