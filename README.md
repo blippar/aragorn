@@ -1,11 +1,26 @@
-Aragorn
-===
+<p align="center">
+    <img alt="Aragorn logo, by Malenea" src="logo.png"></img>
+</p>
+<h4 align="center">Regression testing made easy</h4>
+<p align="center">
+    <a href="https://goreportcard.com/report/github.com/blippar/aragorn">
+        <img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/blippar/aragorn">
+    </a>
+    <a href="https://godoc.org/github.com/blippar/aragorn">
+        <img alt="GoDoc" src="https://godoc.org/github.com/blippar/aragorn?status.svg">
+    </a>
+    <a href="https://github.com/blippar/aragorn/blob/master/LICENSE">
+       <img alt="License" src="https://img.shields.io/github/license/blippar/aragorn.svg">
+    </a>
+    <a href="https://github.com/blippar/aragorn/releases/latest">
+        <img alt="Latest Release" src="https://img.shields.io/github/release/blippar/aragorn.svg">
+    </a>
+    <a href="https://hub.docker.com/r/blippar/aragorn/">
+        <img alt="Docker Image" src="https://img.shields.io/docker/automated/blippar/aragorn.svg">
+    </a>
+</p>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/blippar/aragorn)](https://goreportcard.com/report/github.com/blippar/aragorn)
-[![GoDoc](https://godoc.org/github.com/blippar/aragorn?status.svg)](https://godoc.org/github.com/blippar/aragorn)
-[![GitHub release](https://img.shields.io/github/release/blippar/aragorn.svg)](https://github.com/blippar/aragorn/releases/latest)
-
-[![Aragorn logo, by Malenea](logo.png)](https://github.com/Malenea)
+---
 
 ## Description
 
@@ -392,3 +407,9 @@ This example shows how to create an GRPC test suite file that has 2 tests.
 This project use [OpenTracing](http://opentracing.io/), a vendor-neutral open standard for distributed tracing. When aragorn run a test suite it will create a span that will be propagated in the context, a sub span is created for each test. More details are filled by the test suite package that implement the execution of the test. For example, the http call in the `httpexpect` package is traced in a sub span.
 
 By default, the aragorn command will run with no tracer. You can set a tracer with the tracer flag. More info with `aragorn help exec`.
+
+## Credits
+
+Thanks to [Malenea](https://github.com/malenea) for his awesome work on the logo.
+
+Aragorn's logo is licensed under the [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/) and was widely inspired on the original Go gopher designed by [Renee French](http://reneefrench.blogspot.com/).
