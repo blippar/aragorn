@@ -1,13 +1,12 @@
 package httpexpect
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
-	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/opentracing-contrib/go-stdlib/nethttp"
 	ot "github.com/opentracing/opentracing-go"
@@ -58,9 +57,6 @@ type test struct {
 	client *http.Client
 	req    *http.Request // Raw HTTP request generated from the request description.
 
-	urlPathQueries  []string
-	urlQueryQueries []string
-
 	statusCode int
 	header     testsuite.Header
 
@@ -77,28 +73,44 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 
 	md, ok := testsuite.MDFromContext(ctx)
 	if ok {
-		if len(t.urlPathQueries) > 0 {
-			oldnew := make([]string, 0, len(t.urlPathQueries)*2)
-			for _, q := range t.urlPathQueries {
-				v, err := queryJSONData(q[2:len(q)-2], map[string]interface{}(md))
-				if err != nil {
-					continue
-				}
-				oldnew = append(oldnew, q, fmt.Sprint(v))
+		var b bytes.Buffer
+		if req.URL.RawPath != "" {
+			if tmpl, err := template.New("URL Path").Parse(req.URL.RawPath); err != nil {
+				l.Errorf("could not parse URL path template: %v", err)
+				return
+			} else if err = tmpl.Execute(&b, md); err != nil {
+				l.Errorf("could not execute URL path template: %v", err)
+				return
 			}
-			req.URL.Path = strings.NewReplacer(oldnew...).Replace(req.URL.Path)
+			req.URL.Path = b.String()
 			req.URL.RawPath = ""
+			b.Reset()
 		}
-		if len(t.urlQueryQueries) > 0 {
-			oldnew := make([]string, 0, len(t.urlQueryQueries)*2)
-			for _, q := range t.urlQueryQueries {
-				v, err := queryJSONData(q[2:len(q)-2], map[string]interface{}(md))
-				if err != nil {
-					continue
-				}
-				oldnew = append(oldnew, q, url.QueryEscape(fmt.Sprint(v)))
+
+		if req.URL.RawQuery != "" {
+			if tmpl, err := template.New("URL Query").Parse(req.URL.RawQuery); err != nil {
+				l.Errorf("could not parse URL query template: %v", err)
+				return
+			} else if err = tmpl.Execute(&b, md); err != nil {
+				l.Errorf("could not execute URL query template: %v", err)
+				return
 			}
-			req.URL.RawQuery = strings.NewReplacer(oldnew...).Replace(req.URL.RawQuery)
+			req.URL.RawQuery = b.String()
+			b.Reset()
+		}
+
+		for k, v := range req.Header {
+			for idx, hdr := range v {
+				if tmpl, err := template.New("Request Header").Parse(hdr); err != nil {
+					l.Errorf("could not parse request header '%s' template: %v", k, err)
+					return
+				} else if err = tmpl.Execute(&b, md); err != nil {
+					l.Errorf("could not execute request header '%s' template: %v", k, err)
+					return
+				}
+				req.Header[k][idx] = b.String()
+				b.Reset()
+			}
 		}
 	}
 	opName := "HTTP: " + t.Name()
