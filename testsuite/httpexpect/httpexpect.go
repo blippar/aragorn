@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/Masterminds/sprig"
 	"github.com/opentracing-contrib/go-stdlib/nethttp"
 	ot "github.com/opentracing/opentracing-go"
 	"github.com/xeipuuv/gojsonschema"
@@ -75,7 +76,7 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 	if ok {
 		var b bytes.Buffer
 		if req.URL.RawPath != "" {
-			if tmpl, err := template.New("URL Path").Parse(req.URL.RawPath); err != nil {
+			if tmpl, err := template.New("URL Path").Funcs(sprig.FuncMap()).Parse(req.URL.RawPath); err != nil {
 				l.Errorf("could not parse URL path template: %v", err)
 				return
 			} else if err = tmpl.Execute(&b, md); err != nil {
@@ -88,7 +89,7 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 		}
 
 		if req.URL.RawQuery != "" {
-			if tmpl, err := template.New("URL Query").Parse(req.URL.RawQuery); err != nil {
+			if tmpl, err := template.New("URL Query").Funcs(sprig.FuncMap()).Parse(req.URL.RawQuery); err != nil {
 				l.Errorf("could not parse URL query template: %v", err)
 				return
 			} else if err = tmpl.Execute(&b, md); err != nil {
@@ -101,7 +102,7 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 
 		for k, v := range req.Header {
 			for idx, hdr := range v {
-				if tmpl, err := template.New("Request Header").Parse(hdr); err != nil {
+				if tmpl, err := template.New("Request Header").Funcs(sprig.FuncMap()).Parse(hdr); err != nil {
 					l.Errorf("could not parse request header '%s' template: %v", k, err)
 					return
 				} else if err = tmpl.Execute(&b, md); err != nil {
