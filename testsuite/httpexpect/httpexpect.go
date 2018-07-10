@@ -109,7 +109,7 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 					l.Errorf("could not execute request header '%s' template: %v", k, err)
 					return
 				}
-				req.Header[k][idx] = b.String()
+				v[idx] = b.String()
 				b.Reset()
 			}
 		}
