@@ -76,41 +76,32 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 	if ok {
 		var b bytes.Buffer
 		if req.URL.RawPath != "" {
-			if tmpl, err := template.New("URL Path").Funcs(sprig.FuncMap()).Parse(req.URL.RawPath); err != nil {
-				l.Errorf("could not parse URL path template: %v", err)
-				return
-			} else if err = tmpl.Execute(&b, md); err != nil {
-				l.Errorf("could not execute URL path template: %v", err)
-				return
+			if tmpl, err := template.New("URL Path").Funcs(sprig.FuncMap()).Parse(req.URL.RawPath); err == nil {
+				if err = tmpl.Execute(&b, md); err == nil {
+					req.URL.Path = b.String()
+					req.URL.RawPath = ""
+				}
+				b.Reset()
 			}
-			req.URL.Path = b.String()
-			req.URL.RawPath = ""
-			b.Reset()
 		}
 
 		if req.URL.RawQuery != "" {
-			if tmpl, err := template.New("URL Query").Funcs(sprig.FuncMap()).Parse(req.URL.RawQuery); err != nil {
-				l.Errorf("could not parse URL query template: %v", err)
-				return
-			} else if err = tmpl.Execute(&b, md); err != nil {
-				l.Errorf("could not execute URL query template: %v", err)
-				return
+			if tmpl, err := template.New("URL Query").Funcs(sprig.FuncMap()).Parse(req.URL.RawQuery); err == nil {
+				if err = tmpl.Execute(&b, md); err == nil {
+					req.URL.RawQuery = b.String()
+				}
+				b.Reset()
 			}
-			req.URL.RawQuery = b.String()
-			b.Reset()
 		}
 
-		for k, v := range req.Header {
+		for _, v := range req.Header {
 			for idx, hdr := range v {
-				if tmpl, err := template.New("Request Header").Funcs(sprig.FuncMap()).Parse(hdr); err != nil {
-					l.Errorf("could not parse request header '%s' template: %v", k, err)
-					return
-				} else if err = tmpl.Execute(&b, md); err != nil {
-					l.Errorf("could not execute request header '%s' template: %v", k, err)
-					return
+				if tmpl, err := template.New("Request Header").Funcs(sprig.FuncMap()).Parse(hdr); err == nil {
+					if err = tmpl.Execute(&b, md); err != nil {
+						v[idx] = b.String()
+					}
+					b.Reset()
 				}
-				v[idx] = b.String()
-				b.Reset()
 			}
 		}
 	}
