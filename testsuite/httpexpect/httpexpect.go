@@ -1,14 +1,14 @@
 package httpexpect
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
-	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net/http"
-	"net/url"
-	"strings"
 
+	"github.com/Masterminds/sprig"
 	"github.com/opentracing-contrib/go-stdlib/nethttp"
 	ot "github.com/opentracing/opentracing-go"
 	"github.com/xeipuuv/gojsonschema"
@@ -58,9 +58,6 @@ type test struct {
 	client *http.Client
 	req    *http.Request // Raw HTTP request generated from the request description.
 
-	urlPathQueries  []string
-	urlQueryQueries []string
-
 	statusCode int
 	header     testsuite.Header
 
@@ -77,28 +74,35 @@ func (t *test) Run(ctx context.Context, l testsuite.Logger) {
 
 	md, ok := testsuite.MDFromContext(ctx)
 	if ok {
-		if len(t.urlPathQueries) > 0 {
-			oldnew := make([]string, 0, len(t.urlPathQueries)*2)
-			for _, q := range t.urlPathQueries {
-				v, err := queryJSONData(q[2:len(q)-2], map[string]interface{}(md))
-				if err != nil {
-					continue
+		var b bytes.Buffer
+		if req.URL.RawPath != "" {
+			if tmpl, err := template.New("URL Path").Funcs(sprig.FuncMap()).Parse(req.URL.RawPath); err == nil {
+				if err = tmpl.Execute(&b, md); err == nil {
+					req.URL.Path = b.String()
+					req.URL.RawPath = ""
 				}
-				oldnew = append(oldnew, q, fmt.Sprint(v))
+				b.Reset()
 			}
-			req.URL.Path = strings.NewReplacer(oldnew...).Replace(req.URL.Path)
-			req.URL.RawPath = ""
 		}
-		if len(t.urlQueryQueries) > 0 {
-			oldnew := make([]string, 0, len(t.urlQueryQueries)*2)
-			for _, q := range t.urlQueryQueries {
-				v, err := queryJSONData(q[2:len(q)-2], map[string]interface{}(md))
-				if err != nil {
-					continue
+
+		if req.URL.RawQuery != "" {
+			if tmpl, err := template.New("URL Query").Funcs(sprig.FuncMap()).Parse(req.URL.RawQuery); err == nil {
+				if err = tmpl.Execute(&b, md); err == nil {
+					req.URL.RawQuery = b.String()
 				}
-				oldnew = append(oldnew, q, url.QueryEscape(fmt.Sprint(v)))
+				b.Reset()
 			}
-			req.URL.RawQuery = strings.NewReplacer(oldnew...).Replace(req.URL.RawQuery)
+		}
+
+		for _, v := range req.Header {
+			for idx, hdr := range v {
+				if tmpl, err := template.New("Request Header").Funcs(sprig.FuncMap()).Parse(hdr); err == nil {
+					if err = tmpl.Execute(&b, md); err != nil {
+						v[idx] = b.String()
+					}
+					b.Reset()
+				}
+			}
 		}
 	}
 	opName := "HTTP: " + t.Name()

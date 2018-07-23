@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -17,8 +16,6 @@ import (
 	"github.com/blippar/aragorn/pkg/util/json"
 	"github.com/blippar/aragorn/testsuite"
 )
-
-var varsTmpl = regexp.MustCompile(`{{[0-9A-Za-z._-]+}}`)
 
 type Config struct {
 	Path  string  `json:"path,omitempty"`
@@ -149,8 +146,6 @@ func (t *Test) prepare(cfg *Config, client *http.Client) (*test, error) {
 	} else {
 		test.req = httpReq
 		test.description = httpReq.Method + " " + httpReq.URL.String()
-		test.urlPathQueries = varsTmpl.FindAllString(httpReq.URL.RawPath, -1)
-		test.urlQueryQueries = varsTmpl.FindAllString(httpReq.URL.RawQuery, -1)
 	}
 
 	if test.statusCode == 0 {
